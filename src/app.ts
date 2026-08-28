@@ -22,7 +22,11 @@ app.use(corsMiddleware);
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser(process.env.COOKIE_SECRET || "default_cookie_secret"));
+app.use((req, _res, next) => {
+    delete (req as any).cookies;
+    next();
+});
+app.use(cookieParser(process.env.COOKIE_SECRET?.trim() || "default_cookie_secret"));
 
 app.use("/api", appRouter);
 app.use(appRouter);
