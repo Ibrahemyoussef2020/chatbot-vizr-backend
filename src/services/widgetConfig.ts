@@ -71,11 +71,12 @@ export const deleteWidgetConfigService = async (systemSlug?: string) => {
 
 export const getWidgetEmbedScriptService = (systemSlug?: string) => {
     const slug = systemSlug || "default";
+    const serverUrl = process.env.SERVER_URL || "http://localhost:5000";
     return `<script>
   (function(w,d,s,o,f,js,fjs){
-    w['AI_CHATBOT_CONFIG']={systemSlug:'${slug}',apiUrl:'http://localhost:5000'};
+    w['AI_CHATBOT_CONFIG']={systemSlug:'${slug}',apiUrl:'${serverUrl}'};
     js=d.createElement(s);fjs=d.getElementsByTagName(s)[0];
-    js.id=o;js.src='http://localhost:5000/public/widget.js';js.async=1;
+    js.id=o;js.src='${serverUrl}/public/widget.js';js.async=1;
     fjs.parentNode.insertBefore(js,fjs);
   }(window,document,'script','ai-chatbot-widget'));
 </script>`;

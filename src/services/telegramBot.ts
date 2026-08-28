@@ -91,9 +91,10 @@ export const refreshTelegramWebhookService = async (botId: string) => {
     bot.last_activity_at = new Date();
     await bot.save();
 
+    const serverUrl = process.env.SERVER_URL || "http://localhost:5000";
     return {
         success: true,
-        webhook_url: `http://localhost:5000/api/telegram/webhook/${bot._id}`,
+        webhook_url: `${serverUrl}/api/telegram/webhook/${bot._id}`,
     };
 };
 

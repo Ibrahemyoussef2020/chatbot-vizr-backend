@@ -11,7 +11,10 @@ export const verifyWhatsAppWebhookService = async (
     console.log("[WhatsApp Webhook Verification Check]", { mode, token, challenge });
 
     if (mode === "subscribe" && (token || challenge)) {
-        // Return challenge immediately for Meta verification
+        const expectedToken = process.env.WHATSAPP_CHANNEL_VERIFY || process.env.WHATSAPP_VERIFY_TOKEN;
+        if (expectedToken && token !== expectedToken) {
+            throw new Error("Invalid Webhook verification token.");
+        }
         return challenge || "VERIFIED";
     }
 
