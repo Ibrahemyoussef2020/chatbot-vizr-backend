@@ -18,13 +18,14 @@ const createConversation = async (req: Request, res: Response) => {
 };
 
 const sendMessage = async (req: Request, res: Response) => {
-    const threadId = req.body.threadId;
+    const threadId = req.body.threadId || req.body.id || (req.query.id as string) || (req.query.threadId as string);
     const message = req.body.message;
     const attachments = req.body.attachments;
     const token = getSessionToken(req);
 
     const result = await service.sendMessage({
         id: threadId,
+        threadId,
         token,
         message,
         attachments,
@@ -32,6 +33,7 @@ const sendMessage = async (req: Request, res: Response) => {
 
     res.status(201).json(result);
 };
+
 
 const getMessages = async (req: Request, res: Response) => {
     const id = String(req.params.id);

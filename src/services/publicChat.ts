@@ -1,19 +1,64 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { notFoundError, unauthorizedError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
+import { randomUUID } from "node:crypto";
+import { unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
+import { AIFactory } from "../core/ai-gateway/ai-gateway.factory.js";
 
-const hashToken = (token: string) => createHash("sha256").update(token).digest();
-const findConversation = async (publicId: string, token: string) => {
-    const conversation = await Conversation.findOne({ publicId }).select("+sessionTokenHash").exec();
-    if (!conversation) throw notFoundError("Conversation not found");
-    const storedHash = Buffer.from(conversation.sessionTokenHash, "hex");
-    const suppliedHash = hashToken(token);
-    if (storedHash.length !== suppliedHash.length || !timingSafeEqual(storedHash, suppliedHash)) throw unauthorizedError("Invalid conversation session");
+// Permanent ID lookup helper (never expires, auto-creates if missing by ID)
+export const findOrCreateConversationById = async (
+    publicId?: string,
+    visitorData?: { name?: string; email?: string; phone?: string; systemSlug?: string }
+) => {
+    let conversation = null;
+    const targetId = publicId?.trim();
+
+    if (targetId) {
+        conversation = await Conversation.findOne({ publicId: targetId }).exec();
+    }
+
+    const systemSlug = visitorData?.systemSlug?.trim() || "demo";
+    const name = visitorData?.name?.trim() || "Guest Client";
+    const email = visitorData?.email?.trim().toLowerCase();
+    const phone = visitorData?.phone?.trim();
+
+    if (!conversation && (email || phone || (name && name !== "Guest Client"))) {
+        const queryConditions: any[] = [];
+        if (email) queryConditions.push({ "visitor.email": email });
+        if (phone) queryConditions.push({ "visitor.phone": phone });
+        if (name && name !== "Guest Client") queryConditions.push({ "visitor.name": name });
+
+        if (queryConditions.length > 0) {
+            conversation = await Conversation.findOne({
+                systemSlug,
+                $or: queryConditions,
+            }).exec();
+        }
+    }
+
+    if (!conversation) {
+        conversation = await Conversation.create({
+            publicId: targetId || randomUUID(),
+            sessionTokenHash: "permanent_no_session_needed",
+            systemSlug,
+            status: "active",
+            visitor: {
+                name,
+                email,
+                phone,
+            },
+        });
+    } else {
+        if (!conversation.visitor) conversation.visitor = { name };
+        if (name && name !== "Guest Client") conversation.visitor.name = name;
+        if (email) conversation.visitor.email = email;
+        if (phone) conversation.visitor.phone = phone;
+        await conversation.save();
+    }
+
     return conversation;
 };
 
-interface CreateConversationInput {
+export interface CreateConversationInput {
     systemSlug?: string;
     name?: string;
     email?: string;
@@ -24,25 +69,24 @@ interface CreateConversationInput {
 }
 
 export const createConversation = async (input: CreateConversationInput) => {
-    const sessionToken = randomBytes(32).toString("base64url");
+    const name = (input.user_name ?? input.name ?? "").trim();
+    const email = (input.user_email ?? input.email)?.trim().toLowerCase();
+    const phone = (input.user_phone ?? input.phone)?.trim();
+    const systemSlug = input.systemSlug?.trim() || "demo";
 
-    const name = input.user_name ?? input.name ?? "";
-    const email = input.user_email ?? input.email;
-    const phone = input.user_phone ?? input.phone;
-
-    const conversation = await Conversation.create({
-        publicId: randomUUID(),
-        sessionTokenHash: hashToken(sessionToken).toString("hex"),
-        systemSlug: input.systemSlug?.trim() || "demo",
-        visitor: {
-            name: name.trim(),
-            email: email?.trim().toLowerCase(),
-            phone: phone?.trim(),
-        },
+    const conversation = await findOrCreateConversationById(undefined, {
+        name,
+        email,
+        phone,
+        systemSlug,
     });
 
-    return { thread: { id: conversation.publicId, status: conversation.status }, sessionToken };
+    return {
+        thread: { id: conversation.publicId, status: conversation.status },
+        sessionToken: conversation.publicId,
+    };
 };
+
 export interface AttachmentInput {
     name: string;
     url: string;
@@ -51,29 +95,15 @@ export interface AttachmentInput {
 }
 
 export interface SendMessageInput {
-    id: string;
-    token: string;
+    id?: string;
+    threadId?: string;
+    token?: string;
     message?: string;
     attachments?: AttachmentInput[];
 }
 
-const generateAssistantReply = (content: string, name?: string): string => {
-    const lower = content.toLowerCase();
-    const displayName = name ? ` ${name}` : "";
-
-    if (lower.includes("pricing") || lower.includes("cost") || lower.includes("plan")) {
-        return `Hello${displayName}! Our plans start with Starter at $29/mo, Launch at $79/mo, and Scale Pro at $199/mo. You can view all features on our Pricing page.`;
-    }
-    if (lower.includes("channel") || lower.includes("whatsapp") || lower.includes("telegram")) {
-        return `Vizr supports Web Chat Widget, WhatsApp Business, Telegram, and Meta Messenger integrations out of the box!`;
-    }
-    if (lower.includes("help") || lower.includes("support") || lower.includes("human")) {
-        return `I'm Vizr AI Assistant! I can answer your questions grounded in your knowledge base, capture leads, or route you to a human agent.`;
-    }
-    return `Thanks for reaching out${displayName}! Vizr AI is active and ready to assist with your workspace setups, integrations, and automated workflows.`;
-};
-
 export const sendMessage = async (input: SendMessageInput) => {
+    const targetId = input.id || input.threadId;
     const content = input.message?.trim() || "";
     const attachments = input.attachments || [];
 
@@ -81,10 +111,7 @@ export const sendMessage = async (input: SendMessageInput) => {
         throw unprocessableEntityError("Message content or attachment is required");
     }
 
-    const conversation = await findConversation(input.id, input.token);
-    if (conversation.status !== "active") {
-        throw unprocessableEntityError("Conversation has ended");
-    }
+    const conversation = await findOrCreateConversationById(targetId);
 
     const visitorMessage = await Message.create({
         conversationId: conversation._id,
@@ -93,7 +120,29 @@ export const sendMessage = async (input: SendMessageInput) => {
         attachments,
     });
 
-    const replyText = generateAssistantReply(content, conversation.visitor?.name);
+    let replyText = "";
+    try {
+        const providerName = (process.env.DEFAULT_AI_PROVIDER || "vercel").trim();
+        const aiService = AIFactory.getProvider(providerName);
+
+        const previousMessages = await Message.find({ conversationId: conversation._id })
+            .sort({ createdAt: 1 })
+            .limit(10)
+            .lean();
+
+        const formattedMessages = previousMessages.map((m) => ({
+            role: m.senderType === "visitor" ? ("user" as const) : ("assistant" as const),
+            content: m.content,
+        }));
+
+        replyText = await aiService.generate(formattedMessages, {
+            systemPrompt: `You are Vizr AI, a helpful, friendly, and concise customer support assistant for workspace "${conversation.systemSlug}". Assist the user politely and answer their questions directly.`,
+        });
+    } catch (aiErr: any) {
+        console.error("[publicChat] AI Gateway generate error:", aiErr?.message || aiErr);
+        replyText = "I am processing your request. Please ensure your AI Gateway API Key is configured in settings.";
+    }
+
     const assistantMessage = await Message.create({
         conversationId: conversation._id,
         senderType: "assistant",
@@ -117,8 +166,8 @@ export const sendMessage = async (input: SendMessageInput) => {
     };
 };
 
-export const getMessages = async (input: { id: string; token: string; page?: number; limit?: number }) => {
-    const conversation = await findConversation(input.id, input.token);
+export const getMessages = async (input: { id: string; token?: string; page?: number; limit?: number }) => {
+    const conversation = await findOrCreateConversationById(input.id);
     const page = Math.max(1, input.page || 1);
     const limit = Math.min(50, Math.max(1, input.limit || 25));
 
@@ -152,8 +201,8 @@ export const getMessages = async (input: { id: string; token: string; page?: num
     };
 };
 
-export const endConversation = async (input: { id: string; token: string }) => {
-    const conversation = await findConversation(input.id, input.token);
+export const endConversation = async (input: { id: string; token?: string }) => {
+    const conversation = await findOrCreateConversationById(input.id);
     if (conversation.status !== "ended") {
         conversation.status = "ended";
         conversation.endedAt = new Date();

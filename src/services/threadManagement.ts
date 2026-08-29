@@ -52,7 +52,10 @@ export const listFilteredThreads = async (
     const systemSlug = await resolveWorkspaceSlug(user, input.systemSlug);
     const query: Record<string, unknown> = {};
 
-    if (systemSlug) query.systemSlug = systemSlug;
+    if (systemSlug && systemSlug !== "all") {
+        query.$or = [{ systemSlug }, { systemSlug: "demo" }];
+    }
+
 
     if (input.status && input.status !== "all") {
         if (input.status === "open" || input.status === "active") query.status = "active";
