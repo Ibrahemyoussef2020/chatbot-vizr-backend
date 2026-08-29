@@ -7,14 +7,17 @@ export class VercelAIProvider implements IAIService {
     private getProviderDetails() {
         const rawGatewayKey = process.env.AI_GATEWAY_API_KEY?.trim();
         const rawOpenAIKey = process.env.OPENAI_API_KEY?.trim();
+        const rawSecretKey = process.env.OPEN_AI_SECRET_KEY?.trim();
 
         const gatewayKey = rawGatewayKey && !rawGatewayKey.includes("your_") ? rawGatewayKey : undefined;
         const openAIKey = rawOpenAIKey && !rawOpenAIKey.includes("your_") ? rawOpenAIKey : undefined;
+        const secretKey = rawSecretKey && !rawSecretKey.includes("AI_Chatbot_Key") && !rawSecretKey.includes("your_") ? rawSecretKey : undefined;
 
-        const apiKey = gatewayKey || openAIKey || "";
+        const apiKey = gatewayKey || openAIKey || secretKey || "";
         if (!apiKey) {
-            throw new Error("Missing OpenAI API Key. Please configure OPENAI_API_KEY=sk-... or AI_GATEWAY_API_KEY=vck_... in your environment variables.");
+            throw new Error("Missing OpenAI API Key. Please configure OPENAI_API_KEY=sk-..., OPEN_AI_SECRET_KEY=sk-..., or AI_GATEWAY_API_KEY=vck_... in your environment variables.");
         }
+
 
         const isVercelGateway = Boolean(process.env.AI_GATEWAY_BASE_URL || apiKey.startsWith('vck_'));
         const baseURL = process.env.AI_GATEWAY_BASE_URL || (isVercelGateway ? 'https://ai-gateway.vercel.app/v1' : undefined);
