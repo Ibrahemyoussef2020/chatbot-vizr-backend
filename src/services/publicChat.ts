@@ -120,35 +120,23 @@ export const sendMessage = async (input: SendMessageInput) => {
         attachments,
     });
 
-    let replyText = "";
-    try {
-        const providerName = (process.env.DEFAULT_AI_PROVIDER || "vercel").trim();
-        const aiService = AIFactory.getProvider(providerName);
+    const providerName = (process.env.DEFAULT_AI_PROVIDER || "vercel").trim();
+    const aiService = AIFactory.getProvider(providerName);
 
-        const previousMessages = await Message.find({ conversationId: conversation._id })
-            .sort({ createdAt: 1 })
-            .limit(10)
-            .lean();
+    const previousMessages = await Message.find({ conversationId: conversation._id })
+        .sort({ createdAt: 1 })
+        .limit(10)
+        .lean();
 
-        const formattedMessages = previousMessages.map((m) => ({
-            role: m.senderType === "visitor" ? ("user" as const) : ("assistant" as const),
-            content: m.content,
-        }));
+    const formattedMessages = previousMessages.map((m) => ({
+        role: m.senderType === "visitor" ? ("user" as const) : ("assistant" as const),
+        content: m.content,
+    }));
 
-        replyText = await aiService.generate(formattedMessages, {
-            systemPrompt: `You are Vizr AI, a helpful, friendly, and concise customer support assistant for workspace "${conversation.systemSlug}". Assist the user politely and answer their questions directly.`,
-        });
-    } catch (aiErr: any) {
-        console.error("[publicChat] AI Gateway generate error:", aiErr?.message || aiErr);
-        const lastMsg = content.toLowerCase();
-        if (lastMsg.includes("price") || lastMsg.includes("cost") || lastMsg.includes("plan")) {
-            replyText = "Vizr AI plans start with Starter at $29/mo, Launch at $79/mo, and Scale Pro at $199/mo. You can view features on our Pricing page!";
-        } else if (lastMsg.includes("whatsapp") || lastMsg.includes("telegram") || lastMsg.includes("channel")) {
-            replyText = "Vizr supports Web Chat Widget, WhatsApp Business, Telegram, and Meta Messenger integrations out of the box!";
-        } else {
-            replyText = `Hello! Vizr AI is active and ready to assist with your workspace setups, integrations, and customer workflows. How can I help you today?`;
-        }
-    }
+    const replyText = await aiService.generate(formattedMessages, {
+        systemPrompt: `You are Vizr AI, a helpful, friendly, and concise customer support assistant for workspace "${conversation.systemSlug}". Assist the user politely and answer their questions directly.`,
+    });
+
 
 
     const assistantMessage = await Message.create({
