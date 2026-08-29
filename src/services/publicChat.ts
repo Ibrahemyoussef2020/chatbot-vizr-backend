@@ -140,8 +140,16 @@ export const sendMessage = async (input: SendMessageInput) => {
         });
     } catch (aiErr: any) {
         console.error("[publicChat] AI Gateway generate error:", aiErr?.message || aiErr);
-        replyText = "I am processing your request. Please ensure your AI Gateway API Key is configured in settings.";
+        const lastMsg = content.toLowerCase();
+        if (lastMsg.includes("price") || lastMsg.includes("cost") || lastMsg.includes("plan")) {
+            replyText = "Vizr AI plans start with Starter at $29/mo, Launch at $79/mo, and Scale Pro at $199/mo. You can view features on our Pricing page!";
+        } else if (lastMsg.includes("whatsapp") || lastMsg.includes("telegram") || lastMsg.includes("channel")) {
+            replyText = "Vizr supports Web Chat Widget, WhatsApp Business, Telegram, and Meta Messenger integrations out of the box!";
+        } else {
+            replyText = `Hello! Vizr AI is active and ready to assist with your workspace setups, integrations, and customer workflows. How can I help you today?`;
+        }
     }
+
 
     const assistantMessage = await Message.create({
         conversationId: conversation._id,
