@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { HttpError, ValidationError } from "../core/shared/errors/index.js";
 
 const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("[ERROR HANDLER CAUGHT]:", err);
 
     if (err instanceof ValidationError) {
         return res.status(err.status).json({

@@ -38,6 +38,8 @@ app.use(cookieParser(process.env.COOKIE_SECRET?.trim() || "default_cookie_secret
 app.use("/api", appRouter);
 app.use(appRouter);
 
+
+
 app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
 });
