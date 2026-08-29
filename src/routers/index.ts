@@ -19,6 +19,8 @@ appRouter.use("/users", userRouter);
 appRouter.use("/landing", landingRouter);
 appRouter.use("/system/chat", chatsRouter);
 appRouter.use("/chats", chatsRouter);
+appRouter.use("/chat", chatsRouter);
+
 appRouter.use("/admin", workspaceRouter);
 appRouter.use("/subscription", subscriptionRouter);
 

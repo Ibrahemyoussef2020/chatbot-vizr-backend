@@ -13,7 +13,15 @@ chatsRouter.post(
     validateRequest,
     publicChatController.create,
 );
+chatsRouter.post(
+    "/create",
+    createPublicConversationValidator,
+    validateRequest,
+    publicChatController.create,
+);
 chatsRouter.post("/", publicChatController.send);
+chatsRouter.post("/send", publicChatController.send);
+
 chatsRouter.get("/:id/messages", publicChatController.messages);
 chatsRouter.post("/:id/end", publicChatController.end);
 export default chatsRouter;
