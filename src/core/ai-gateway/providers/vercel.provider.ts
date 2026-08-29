@@ -12,6 +12,10 @@ export class VercelAIProvider implements IAIService {
         const openAIKey = rawOpenAIKey && !rawOpenAIKey.includes("your_") ? rawOpenAIKey : undefined;
 
         const apiKey = gatewayKey || openAIKey || "";
+        if (!apiKey) {
+            throw new Error("Missing OpenAI API Key. Please configure OPENAI_API_KEY=sk-... or AI_GATEWAY_API_KEY=vck_... in your environment variables.");
+        }
+
         const isVercelGateway = Boolean(process.env.AI_GATEWAY_BASE_URL || apiKey.startsWith('vck_'));
         const baseURL = process.env.AI_GATEWAY_BASE_URL || (isVercelGateway ? 'https://ai-gateway.vercel.app/v1' : undefined);
 
