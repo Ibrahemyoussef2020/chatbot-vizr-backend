@@ -23,6 +23,8 @@ app.use((_req, res, next) => {
 });
 
 app.use(corsMiddleware);
+app.options("*", corsMiddleware);
+
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

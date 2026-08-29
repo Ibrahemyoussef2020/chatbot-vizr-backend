@@ -71,7 +71,7 @@ export const deleteWidgetConfigService = async (systemSlug?: string) => {
 
 export const getWidgetEmbedScriptService = (systemSlug?: string) => {
     const slug = systemSlug || "default";
-    const serverUrl = process.env.SERVER_URL || "http://localhost:5000";
+    const serverUrl = process.env.SERVER_URL || "https://chatbot-vizr-backend.vercel.app";
     return `<script>
   (function(w,d,s,o,f,js,fjs){
     w['AI_CHATBOT_CONFIG']={systemSlug:'${slug}',apiUrl:'${serverUrl}'};

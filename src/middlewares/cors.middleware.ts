@@ -12,8 +12,10 @@ export const isAllowedOrigin = (origin?: string): boolean => {
     const configuredOrigins = getConfiguredOrigins();
     if (configuredOrigins.includes(origin)) return true;
     if (/\.vercel\.app$/.test(origin)) return true;
-    return process.env.NODE_ENV !== "production" && /^http:\/\/(?:localhost|127\.0\.0\.1):\d+$/.test(origin);
+    if (/^http:\/\/(?:localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
+    return false;
 };
+
 
 export const corsMiddleware = cors({
     origin(origin, callback) {
