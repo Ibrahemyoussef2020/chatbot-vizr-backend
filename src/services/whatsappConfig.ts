@@ -130,7 +130,15 @@ export const getWhatsAppTemplatesService = async (systemSlug?: string) => {
     if (!response.ok) throw new Error(`Meta Cloud API Error: ${result?.error?.message || response.statusText}`);
 
     return (result.data || [])
-        .filter((template: any) => template.status === "APPROVED")
+        .filter((template: any) => {
+            if (template.status !== "APPROVED") return false;
+            const components = template.components || [];
+            const needsMedia = components.some((component: any) =>
+                component.type === "CAROUSEL" ||
+                (component.type === "HEADER" && ["IMAGE", "VIDEO", "DOCUMENT"].includes(component.format)),
+            );
+            return !needsMedia;
+        })
         .map((template: any) => {
             const body = (template.components || []).find((component: any) => component.type === "BODY")?.text || "";
             const parameterCount = Math.max(0, ...Array.from(body.matchAll(/\{\{(\d+)\}\}/g), (match: any) => Number(match[1])));
