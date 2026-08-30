@@ -80,6 +80,7 @@ workspaceRouter.get("/whatsapp/config", whatsappConfigController.getWhatsAppConf
 workspaceRouter.post("/whatsapp/config", whatsappConfigController.saveWhatsAppConfig);
 workspaceRouter.get("/whatsapp/templates", whatsappConfigController.getWhatsAppTemplates);
 workspaceRouter.get("/whatsapp/conversation-status", whatsappConfigController.getWhatsAppConversationStatus);
+workspaceRouter.get("/whatsapp/connection-status", whatsappConfigController.getWhatsAppConnectionStatus);
 workspaceRouter.get("/whatsapp/openwa/qr", whatsappConfigController.getOpenWAQR);
 workspaceRouter.post("/whatsapp/openwa/sessions", whatsappConfigController.createOpenWASession);
 workspaceRouter.delete("/whatsapp/openwa/sessions/:sessionId", whatsappConfigController.deleteOpenWASession);

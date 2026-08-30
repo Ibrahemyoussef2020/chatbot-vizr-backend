@@ -8,6 +8,7 @@ import {
     sendWhatsAppTestMessageService,
     getWhatsAppTemplatesService,
     getWhatsAppConversationStatusService,
+    getWhatsAppConnectionStatusService,
 } from "../services/whatsappConfig.js";
 
 const parseSlug = (req: Request): string | undefined => {
@@ -98,5 +99,13 @@ export const getWhatsAppConversationStatus = async (req: Request, res: Response)
         res.json({ success: true, data: await getWhatsAppConversationStatusService(phone, parseSlug(req)) });
     } catch (error: any) {
         res.status(400).json({ success: false, message: error.message || "Failed to fetch conversation status." });
+    }
+};
+
+export const getWhatsAppConnectionStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+        res.json({ success: true, data: await getWhatsAppConnectionStatusService(parseSlug(req)) });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message || "Failed to validate Meta connection." });
     }
 };

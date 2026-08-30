@@ -152,6 +152,31 @@ export const getWhatsAppTemplatesService = async (systemSlug?: string) => {
         });
 };
 
+export const getWhatsAppConnectionStatusService = async (systemSlug?: string) => {
+    const ws = await resolveWorkspace(systemSlug);
+    const config = ws ? await WhatsAppConfig.findOne({ workspaceId: ws._id }).exec() : null;
+    if (!config?.whatsapp_phone_number_id || !config.whatsapp_access_token) {
+        return { connected: false, reason: "Meta Phone Number ID or Access Token is missing." };
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v18.0/${config.whatsapp_phone_number_id}?fields=id`, {
+        headers: { Authorization: `Bearer ${config.whatsapp_access_token}` },
+    });
+    const result: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const code = result?.error?.code;
+        const subcode = result?.error?.error_subcode;
+        const expired = code === 190 && subcode === 463;
+        return {
+            connected: false,
+            reason: expired ? "Meta Access Token expired. Enter a new permanent System User token." : result?.error?.message || "Meta authentication failed.",
+            code,
+            subcode,
+        };
+    }
+    return { connected: true, reason: null };
+};
+
 export const getWhatsAppConversationStatusService = async (phone: string, systemSlug?: string) => {
     const cleanPhone = String(phone || "").replace(/\D/g, "");
     if (!cleanPhone) throw new Error("A recipient phone number is required.");
