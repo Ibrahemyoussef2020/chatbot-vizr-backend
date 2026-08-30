@@ -70,10 +70,10 @@ export const saveWhatsAppConfigService = async (systemSlug?: string, payload?: a
     if (payload?.internal_server_url !== undefined) config.internal_server_url = payload.internal_server_url;
     if (payload?.openai_api_key !== undefined) config.openai_api_key = payload.openai_api_key;
     if (payload?.whatsapp_app_secret !== undefined) config.whatsapp_app_secret = payload.whatsapp_app_secret;
-    if (payload?.whatsapp_phone_number_id !== undefined) config.whatsapp_phone_number_id = payload.whatsapp_phone_number_id;
+    if (payload?.whatsapp_phone_number_id !== undefined) config.whatsapp_phone_number_id = String(payload.whatsapp_phone_number_id).trim();
     if (payload?.whatsapp_verify_token !== undefined) config.whatsapp_verify_token = payload.whatsapp_verify_token;
-    if (payload?.whatsapp_waba_id !== undefined) config.whatsapp_waba_id = payload.whatsapp_waba_id;
-    if (payload?.whatsapp_access_token !== undefined) config.whatsapp_access_token = payload.whatsapp_access_token;
+    if (payload?.whatsapp_waba_id !== undefined) config.whatsapp_waba_id = String(payload.whatsapp_waba_id).trim();
+    if (payload?.whatsapp_access_token !== undefined) config.whatsapp_access_token = String(payload.whatsapp_access_token).trim();
     if (payload?.openwa_api_url !== undefined) config.openwa_api_url = payload.openwa_api_url;
     if (payload?.openwa_api_key !== undefined) config.openwa_api_key = payload.openwa_api_key;
     if (payload?.openwa_session_id !== undefined) config.openwa_session_id = payload.openwa_session_id;
@@ -188,15 +188,9 @@ export const getWhatsAppConversationStatusService = async (phone: string, system
         category: "whatsapp-inbound",
         "metadata.phone": cleanPhone,
     }).sort({ createdAt: -1 }).lean().exec();
-    // Older/duplicated workspace configurations may cause Meta events to be
-    // recorded under another slug. The sender phone still uniquely identifies
-    // the conversation, so fall back to the latest inbound event for it.
-    if (!latestInbound) {
-        latestInbound = await SystemLog.findOne({
-            category: "whatsapp-inbound",
-            "metadata.phone": cleanPhone,
-        }).sort({ createdAt: -1 }).lean().exec();
-    }
+    // Do not fall back to another workspace. The same customer phone can talk
+    // to multiple businesses, and unlocking from a foreign inbound event would
+    // send the reply with the wrong Meta credentials.
     const repliedAt = latestInbound?.createdAt ? new Date(latestInbound.createdAt) : null;
     const windowExpiresAt = repliedAt ? new Date(repliedAt.getTime() + 24 * 60 * 60 * 1000) : null;
 
@@ -232,8 +226,8 @@ export const sendWhatsAppTestMessageService = async (
     const provider = config.provider || "meta";
 
     if (provider === "meta") {
-        const phoneId = config.whatsapp_phone_number_id;
-        const accessToken = config.whatsapp_access_token;
+        const phoneId = config.whatsapp_phone_number_id?.trim();
+        const accessToken = config.whatsapp_access_token?.trim();
 
         if (!phoneId || !accessToken || phoneId.includes("demo") || accessToken.includes("demo")) {
             throw new Error(
@@ -278,8 +272,14 @@ export const sendWhatsAppTestMessageService = async (
         const resData: any = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-            const metaErr = resData?.error?.message || resData?.error?.error_data?.details || `HTTP ${res.status}: ${res.statusText}`;
-            throw new Error(`Meta Cloud API Error: ${metaErr}`);
+            const error = resData?.error;
+            const metaErr = error?.error_data?.details || error?.message || `HTTP ${res.status}: ${res.statusText}`;
+            const identifiers = [
+                error?.code != null ? `code ${error.code}` : "",
+                error?.error_subcode != null ? `subcode ${error.error_subcode}` : "",
+                error?.fbtrace_id ? `trace ${error.fbtrace_id}` : "",
+            ].filter(Boolean).join(", ");
+            throw new Error(`Meta Cloud API Error${identifiers ? ` (${identifiers})` : ""}: ${metaErr}`);
         }
 
         return {

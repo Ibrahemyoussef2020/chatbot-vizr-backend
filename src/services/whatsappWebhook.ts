@@ -75,11 +75,9 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
 
     console.log(`[WhatsApp Inbound] Phone: ${fromPhone} | Text: "${textBody}"`);
 
-    let config = await WhatsAppConfig.findOne({ whatsapp_phone_number_id: phoneNumberId }).exec();
-    if (!config) {
-        config = await WhatsAppConfig.findOne().exec();
-    }
-
+    const config = phoneNumberId
+        ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: String(phoneNumberId).trim() }).exec()
+        : null;
     if (!config) return;
 
     const workspace = await Workspace.findById(config.workspaceId).exec();
