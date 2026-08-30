@@ -17,7 +17,7 @@ export const seedConfig = {
         },
     ],
     workspace: {
-        name: "Brand Ecommerce",
+        name: "Brand Ecommerce", 
         slug: "brand-ecommerce",
         rateLimit: 120,
     },
