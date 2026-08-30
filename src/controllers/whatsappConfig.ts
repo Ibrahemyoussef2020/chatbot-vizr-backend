@@ -68,8 +68,13 @@ export const getOpenWAQR = async (req: Request, res: Response): Promise<void> =>
 export const sendWhatsAppTestMessage = async (req: Request, res: Response): Promise<void> => {
     try {
         const slug = parseSlug(req);
-        const { phone, text } = req.body;
-        const result = await sendWhatsAppTestMessageService(phone, text, slug);
+        const { phone, text, mode, template_name, template_language } = req.body;
+        const result = await sendWhatsAppTestMessageService(phone, text, slug, {
+            // The test dispatcher starts conversations, so templates are the safe default.
+            mode: mode === "text" ? "text" : "template",
+            templateName: template_name,
+            templateLanguage: template_language,
+        });
         res.json({ success: true, data: result, message: "WhatsApp test message dispatched." });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to send WhatsApp test message." });

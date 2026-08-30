@@ -117,7 +117,12 @@ export const getOpenWAQRService = (systemSlug?: string) => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=OPENWA_GATEWAY_LINK_${slug.toUpperCase()}_${Date.now()}`;
 };
 
-export const sendWhatsAppTestMessageService = async (phone: string, text: string, systemSlug?: string) => {
+export const sendWhatsAppTestMessageService = async (
+    phone: string,
+    text: string,
+    systemSlug?: string,
+    options?: { mode?: "text" | "template"; templateName?: string; templateLanguage?: string },
+) => {
     const ws = await resolveWorkspace(systemSlug);
     const config = ws ? await WhatsAppConfig.findOne({ workspaceId: ws._id }).exec() : null;
 
@@ -145,16 +150,24 @@ export const sendWhatsAppTestMessageService = async (phone: string, text: string
         }
 
         const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`;
-        const payload = {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: cleanPhone,
-            type: "text",
-            text: {
-                preview_url: false,
-                body: text,
-            },
-        };
+        const mode = options?.mode || "text";
+        const templateName = options?.templateName?.trim() || "hello_world";
+        const templateLanguage = options?.templateLanguage?.trim() || "en_US";
+        const payload = mode === "template"
+            ? {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: cleanPhone,
+                type: "template",
+                template: { name: templateName, language: { code: templateLanguage } },
+            }
+            : {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: cleanPhone,
+                type: "text",
+                text: { preview_url: false, body: text },
+            };
 
         const res = await fetch(url, {
             method: "POST",
@@ -177,6 +190,8 @@ export const sendWhatsAppTestMessageService = async (phone: string, text: string
             message_id: resData?.messages?.[0]?.id || "unknown",
             phone: cleanPhone,
             text,
+            mode,
+            template_name: mode === "template" ? templateName : undefined,
             provider: "meta",
             routed_via_ai_engine: aiEngine,
             timestamp: new Date().toISOString(),

@@ -1,4 +1,5 @@
-import { WhatsAppConfig } from "../models/index.js";
+import { randomUUID } from "node:crypto";
+import { SystemLog, WhatsAppConfig, Workspace } from "../models/index.js";
 
 /**
  * Verifies Meta Webhook challenge token against stored workspace config.
@@ -30,6 +31,31 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
+    const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
+
+    if (statuses.length) {
+        const phoneNumberId = value?.metadata?.phone_number_id;
+        const config = phoneNumberId
+            ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: phoneNumberId }).exec()
+            : null;
+        const workspace = config ? await Workspace.findById(config.workspaceId).exec() : null;
+
+        await Promise.all(statuses.map((status: any) => SystemLog.create({
+            publicId: `wa_${randomUUID()}`,
+            systemSlug: workspace?.slug || "unknown",
+            level: status.status === "failed" ? "error" : "info",
+            category: "whatsapp-delivery",
+            message: `WhatsApp message ${status.status || "status updated"}`,
+            metadata: {
+                messageId: status.id,
+                recipient: status.recipient_id,
+                status: status.status,
+                timestamp: status.timestamp,
+                errors: status.errors || [],
+            },
+        })));
+    }
+
     const message = value?.messages?.[0];
 
     if (!message || message.type !== "text") return;
