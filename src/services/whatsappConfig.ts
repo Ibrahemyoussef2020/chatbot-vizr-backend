@@ -158,11 +158,20 @@ export const getWhatsAppConversationStatusService = async (phone: string, system
     const ws = await resolveWorkspace(systemSlug);
     if (!ws) throw new Error("Workspace not found.");
 
-    const latestInbound: any = await SystemLog.findOne({
+    let latestInbound: any = await SystemLog.findOne({
         systemSlug: ws.slug,
         category: "whatsapp-inbound",
         "metadata.phone": cleanPhone,
     }).sort({ createdAt: -1 }).lean().exec();
+    // Older/duplicated workspace configurations may cause Meta events to be
+    // recorded under another slug. The sender phone still uniquely identifies
+    // the conversation, so fall back to the latest inbound event for it.
+    if (!latestInbound) {
+        latestInbound = await SystemLog.findOne({
+            category: "whatsapp-inbound",
+            "metadata.phone": cleanPhone,
+        }).sort({ createdAt: -1 }).lean().exec();
+    }
     const repliedAt = latestInbound?.createdAt ? new Date(latestInbound.createdAt) : null;
     const windowExpiresAt = repliedAt ? new Date(repliedAt.getTime() + 24 * 60 * 60 * 1000) : null;
 
