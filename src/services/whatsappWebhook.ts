@@ -34,6 +34,12 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
     const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
 
     if (statuses.length) {
+        console.log("[WhatsApp Delivery Status]", JSON.stringify(statuses.map((status: any) => ({
+            id: status.id,
+            recipient: status.recipient_id,
+            status: status.status,
+            errors: status.errors || [],
+        }))));
         const phoneNumberId = value?.metadata?.phone_number_id;
         const config = phoneNumberId
             ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: phoneNumberId }).exec()

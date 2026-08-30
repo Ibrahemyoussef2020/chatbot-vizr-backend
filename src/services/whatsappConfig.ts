@@ -193,6 +193,11 @@ export const getWhatsAppConversationStatusService = async (phone: string, system
     // send the reply with the wrong Meta credentials.
     const repliedAt = latestInbound?.createdAt ? new Date(latestInbound.createdAt) : null;
     const windowExpiresAt = repliedAt ? new Date(repliedAt.getTime() + 24 * 60 * 60 * 1000) : null;
+    const latestDelivery: any = await SystemLog.findOne({
+        systemSlug: ws.slug,
+        category: "whatsapp-delivery",
+        "metadata.recipient": cleanPhone,
+    }).sort({ createdAt: -1 }).lean().exec();
 
     return {
         phone: cleanPhone,
@@ -200,6 +205,11 @@ export const getWhatsAppConversationStatusService = async (phone: string, system
         latest_message: latestInbound?.metadata?.text || null,
         replied_at: repliedAt?.toISOString() || null,
         window_expires_at: windowExpiresAt?.toISOString() || null,
+        latest_delivery: latestDelivery ? {
+            status: latestDelivery.metadata?.status || null,
+            errors: latestDelivery.metadata?.errors || [],
+            recorded_at: latestDelivery.createdAt?.toISOString?.() || null,
+        } : null,
     };
 };
 
