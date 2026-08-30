@@ -73,6 +73,16 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
 
     if (!config || !config.whatsapp_access_token) return;
 
+    const workspace = await Workspace.findById(config.workspaceId).exec();
+    await SystemLog.create({
+        publicId: `wa_${randomUUID()}`,
+        systemSlug: workspace?.slug || "unknown",
+        level: "info",
+        category: "whatsapp-inbound",
+        message: `WhatsApp reply received from ${fromPhone}`,
+        metadata: { phone: fromPhone, text: textBody, messageId: message.id },
+    });
+
     let aiReply = "Thank you for reaching out! Our AI assistant is currently processing your request.";
 
     if (config.ai_engine_type === "internal_server" && config.internal_server_url) {

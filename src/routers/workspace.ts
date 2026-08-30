@@ -78,6 +78,8 @@ workspaceRouter.get("/widgets-mgmt/embed-script", widgetConfigController.getWidg
 // WhatsApp Channel Configs & OpenWA Gateway
 workspaceRouter.get("/whatsapp/config", whatsappConfigController.getWhatsAppConfig);
 workspaceRouter.post("/whatsapp/config", whatsappConfigController.saveWhatsAppConfig);
+workspaceRouter.get("/whatsapp/templates", whatsappConfigController.getWhatsAppTemplates);
+workspaceRouter.get("/whatsapp/conversation-status", whatsappConfigController.getWhatsAppConversationStatus);
 workspaceRouter.get("/whatsapp/openwa/qr", whatsappConfigController.getOpenWAQR);
 workspaceRouter.post("/whatsapp/openwa/sessions", whatsappConfigController.createOpenWASession);
 workspaceRouter.delete("/whatsapp/openwa/sessions/:sessionId", whatsappConfigController.deleteOpenWASession);

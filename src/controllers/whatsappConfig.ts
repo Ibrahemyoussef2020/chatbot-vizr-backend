@@ -6,6 +6,8 @@ import {
     deleteOpenWASessionService,
     getOpenWAQRService,
     sendWhatsAppTestMessageService,
+    getWhatsAppTemplatesService,
+    getWhatsAppConversationStatusService,
 } from "../services/whatsappConfig.js";
 
 const parseSlug = (req: Request): string | undefined => {
@@ -68,15 +70,33 @@ export const getOpenWAQR = async (req: Request, res: Response): Promise<void> =>
 export const sendWhatsAppTestMessage = async (req: Request, res: Response): Promise<void> => {
     try {
         const slug = parseSlug(req);
-        const { phone, text, mode, template_name, template_language } = req.body;
+        const { phone, text, mode, template_name, template_language, template_parameters } = req.body;
         const result = await sendWhatsAppTestMessageService(phone, text, slug, {
             // The test dispatcher starts conversations, so templates are the safe default.
             mode: mode === "text" ? "text" : "template",
             templateName: template_name,
             templateLanguage: template_language,
+            templateParameters: Array.isArray(template_parameters) ? template_parameters : [],
         });
         res.json({ success: true, data: result, message: "WhatsApp test message dispatched." });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to send WhatsApp test message." });
+    }
+};
+
+export const getWhatsAppTemplates = async (req: Request, res: Response): Promise<void> => {
+    try {
+        res.json({ success: true, data: await getWhatsAppTemplatesService(parseSlug(req)) });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message || "Failed to fetch WhatsApp templates." });
+    }
+};
+
+export const getWhatsAppConversationStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const phone = typeof req.query.phone === "string" ? req.query.phone : "";
+        res.json({ success: true, data: await getWhatsAppConversationStatusService(phone, parseSlug(req)) });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message || "Failed to fetch conversation status." });
     }
 };

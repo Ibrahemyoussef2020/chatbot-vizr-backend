@@ -1,4 +1,4 @@
-import { Workspace, WhatsAppConfig } from "../models/index.js";
+import { SystemLog, Workspace, WhatsAppConfig } from "../models/index.js";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -117,11 +117,61 @@ export const getOpenWAQRService = (systemSlug?: string) => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=OPENWA_GATEWAY_LINK_${slug.toUpperCase()}_${Date.now()}`;
 };
 
+export const getWhatsAppTemplatesService = async (systemSlug?: string) => {
+    const ws = await resolveWorkspace(systemSlug);
+    const config = ws ? await WhatsAppConfig.findOne({ workspaceId: ws._id }).exec() : null;
+    if (!config?.whatsapp_waba_id || !config.whatsapp_access_token) {
+        throw new Error("Meta WABA ID and Access Token are required.");
+    }
+
+    const url = `https://graph.facebook.com/v18.0/${config.whatsapp_waba_id}/message_templates?fields=name,status,language,category,components&limit=100`;
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${config.whatsapp_access_token}` } });
+    const result: any = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`Meta Cloud API Error: ${result?.error?.message || response.statusText}`);
+
+    return (result.data || [])
+        .filter((template: any) => template.status === "APPROVED")
+        .map((template: any) => {
+            const body = (template.components || []).find((component: any) => component.type === "BODY")?.text || "";
+            const parameterCount = Math.max(0, ...Array.from(body.matchAll(/\{\{(\d+)\}\}/g), (match: any) => Number(match[1])));
+            return {
+                name: template.name,
+                language: template.language,
+                category: template.category,
+                body,
+                parameter_count: parameterCount,
+            };
+        });
+};
+
+export const getWhatsAppConversationStatusService = async (phone: string, systemSlug?: string) => {
+    const cleanPhone = String(phone || "").replace(/\D/g, "");
+    if (!cleanPhone) throw new Error("A recipient phone number is required.");
+    const ws = await resolveWorkspace(systemSlug);
+    if (!ws) throw new Error("Workspace not found.");
+
+    const latestInbound: any = await SystemLog.findOne({
+        systemSlug: ws.slug,
+        category: "whatsapp-inbound",
+        "metadata.phone": cleanPhone,
+    }).sort({ createdAt: -1 }).lean().exec();
+    const repliedAt = latestInbound?.createdAt ? new Date(latestInbound.createdAt) : null;
+    const windowExpiresAt = repliedAt ? new Date(repliedAt.getTime() + 24 * 60 * 60 * 1000) : null;
+
+    return {
+        phone: cleanPhone,
+        replied: Boolean(windowExpiresAt && windowExpiresAt.getTime() > Date.now()),
+        latest_message: latestInbound?.metadata?.text || null,
+        replied_at: repliedAt?.toISOString() || null,
+        window_expires_at: windowExpiresAt?.toISOString() || null,
+    };
+};
+
 export const sendWhatsAppTestMessageService = async (
     phone: string,
     text: string,
     systemSlug?: string,
-    options?: { mode?: "text" | "template"; templateName?: string; templateLanguage?: string },
+    options?: { mode?: "text" | "template"; templateName?: string; templateLanguage?: string; templateParameters?: string[] },
 ) => {
     const ws = await resolveWorkspace(systemSlug);
     const config = ws ? await WhatsAppConfig.findOne({ workspaceId: ws._id }).exec() : null;
@@ -153,13 +203,18 @@ export const sendWhatsAppTestMessageService = async (
         const mode = options?.mode || "text";
         const templateName = options?.templateName?.trim() || "hello_world";
         const templateLanguage = options?.templateLanguage?.trim() || "en_US";
+        const templateParameters = (options?.templateParameters || []).map((value) => ({ type: "text", text: String(value) }));
         const payload = mode === "template"
             ? {
                 messaging_product: "whatsapp",
                 recipient_type: "individual",
                 to: cleanPhone,
                 type: "template",
-                template: { name: templateName, language: { code: templateLanguage } },
+                template: {
+                    name: templateName,
+                    language: { code: templateLanguage },
+                    ...(templateParameters.length ? { components: [{ type: "body", parameters: templateParameters }] } : {}),
+                },
             }
             : {
                 messaging_product: "whatsapp",
