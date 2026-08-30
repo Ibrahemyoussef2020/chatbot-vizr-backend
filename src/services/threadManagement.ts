@@ -3,6 +3,7 @@ import Message from "../models/Message.js";
 import Workspace from "../models/Workspace.js";
 import { forbiddenError, notFoundError } from "../core/shared/errors/HttpError.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
+import { sendWhatsAppTestMessageService } from "./whatsappConfig.js";
 
 const resolveWorkspaceSlug = async (
     user: AuthenticatedUserContext,
@@ -291,6 +292,18 @@ export const replyToThreadService = async (
     await Conversation.findByIdAndUpdate(conversation._id, {
         $set: { updatedAt: new Date() },
     });
+
+    if (conversation.visitor?.phone) {
+        try {
+            await sendWhatsAppTestMessageService(
+                conversation.visitor.phone,
+                content,
+                conversation.systemSlug
+            );
+        } catch (error: any) {
+            console.error(`[WhatsApp Dispatch Error] Failed to send to ${conversation.visitor.phone}:`, error.message);
+        }
+    }
 
     return {
         id: String(message._id),
