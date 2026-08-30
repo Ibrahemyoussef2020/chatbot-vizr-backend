@@ -7,6 +7,7 @@ import appRouter from "./routers/index.js";
 import { AIFactory } from "./core/ai-gateway/ai-gateway.factory.js";
 import { VercelAIProvider } from "./core/ai-gateway/providers/vercel.provider.js";
 import { CustomAIProvider } from "./core/ai-gateway/providers/custom.provider.js";
+import { GoogleAIProvider } from "./core/ai-gateway/providers/google.provider.js";
 import aiRouter from "./core/ai-gateway/ai.route.js";
 
 dotenv.config();
@@ -48,6 +49,11 @@ app.get("/health", (_req, res) => {
 
 AIFactory.registerProvider('vercel', new VercelAIProvider());
 AIFactory.registerProvider('custom', new CustomAIProvider());
+AIFactory.registerProvider('google', new GoogleAIProvider());
+
+if (!process.env.DEFAULT_AI_PROVIDER) {
+    process.env.DEFAULT_AI_PROVIDER = 'google';
+}
 
 
 app.use('/api/ai', aiRouter);
