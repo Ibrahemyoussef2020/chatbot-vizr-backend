@@ -19,7 +19,7 @@ export class GoogleAIProvider implements IAIService {
     }
 
     private resolveModelName(requestedModel: string | undefined): string {
-        return requestedModel || "gemini-2.5-flash"; // default to gemini-2.5-flash as it is free and fast
+        return requestedModel || "gemini-3.6-flash"; // default to gemini-3.6-flash as it is free and fast
     }
 
     async stream(messages: ModelMessage[], res: Response, options?: AIGatewayOptions): Promise<void> {
