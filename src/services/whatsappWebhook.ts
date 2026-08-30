@@ -23,7 +23,8 @@ export const verifyWhatsAppWebhookService = async (
 };
 
 /**
- * Handles incoming Meta WhatsApp Webhook event: parses message, queries AI engine, and relays response.
+ * Persists Meta delivery and inbound-message events. Keep this request path
+ * fast and deterministic so serverless runtimes can acknowledge Meta reliably.
  */
 export const handleWhatsAppWebhookEventService = async (body: any): Promise<void> => {
     if (body?.object !== "whatsapp_business_account") return;
@@ -40,7 +41,10 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
             : null;
         const workspace = config ? await Workspace.findById(config.workspaceId).exec() : null;
 
-        await Promise.all(statuses.map((status: any) => SystemLog.create({
+        await Promise.all(statuses.map(async (status: any) => {
+            const exists = await SystemLog.exists({ category: "whatsapp-delivery", "metadata.messageId": status.id, "metadata.status": status.status });
+            if (exists) return;
+            await SystemLog.create({
             publicId: `wa_${randomUUID()}`,
             systemSlug: workspace?.slug || "unknown",
             level: status.status === "failed" ? "error" : "info",
@@ -53,15 +57,20 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
                 timestamp: status.timestamp,
                 errors: status.errors || [],
             },
-        })));
+            });
+        }));
     }
 
     const message = value?.messages?.[0];
 
-    if (!message || message.type !== "text") return;
+    if (!message) return;
 
     const fromPhone = message.from;
-    const textBody = message.text?.body;
+    const textBody = message.text?.body
+        || message.button?.text
+        || message.interactive?.button_reply?.title
+        || message.interactive?.list_reply?.title
+        || `[${message.type || "unsupported"} message]`;
     const phoneNumberId = value?.metadata?.phone_number_id;
 
     console.log(`[WhatsApp Inbound] Phone: ${fromPhone} | Text: "${textBody}"`);
@@ -71,82 +80,17 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
         config = await WhatsAppConfig.findOne().exec();
     }
 
-    if (!config || !config.whatsapp_access_token) return;
+    if (!config) return;
 
     const workspace = await Workspace.findById(config.workspaceId).exec();
+    const alreadyRecorded = await SystemLog.exists({ category: "whatsapp-inbound", "metadata.messageId": message.id });
+    if (alreadyRecorded) return;
     await SystemLog.create({
         publicId: `wa_${randomUUID()}`,
         systemSlug: workspace?.slug || "unknown",
         level: "info",
         category: "whatsapp-inbound",
         message: `WhatsApp reply received from ${fromPhone}`,
-        metadata: { phone: fromPhone, text: textBody, messageId: message.id },
+        metadata: { phone: fromPhone, text: textBody, messageId: message.id, type: message.type },
     });
-
-    let aiReply = "Thank you for reaching out! Our AI assistant is currently processing your request.";
-
-    if (config.ai_engine_type === "internal_server" && config.internal_server_url) {
-        try {
-            const internalRes = await fetch(`${config.internal_server_url}/chat/completions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    messages: [
-                        { role: "system", content: "You are a helpful customer support AI assistant for WhatsApp." },
-                        { role: "user", content: textBody },
-                    ],
-                }),
-            });
-            const internalData: any = await internalRes.json();
-            if (internalData?.choices?.[0]?.message?.content) {
-                aiReply = internalData.choices[0].message.content;
-            }
-        } catch (err: any) {
-            console.error("[WhatsApp Internal AI Error]", err.message);
-        }
-    } else if (config.openai_api_key) {
-        try {
-            const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${config.openai_api_key}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: "gpt-3.5-turbo",
-                    messages: [
-                        { role: "system", content: "You are a helpful customer support AI assistant for WhatsApp." },
-                        { role: "user", content: textBody },
-                    ],
-                }),
-            });
-            const aiData: any = await openAiRes.json();
-            if (aiData?.choices?.[0]?.message?.content) {
-                aiReply = aiData.choices[0].message.content;
-            }
-        } catch (err: any) {
-            console.error("[WhatsApp OpenAI Error]", err.message);
-        }
-    }
-
-    // Relay AI response back to user via Meta Cloud API
-    const targetPhoneId = config.whatsapp_phone_number_id || phoneNumberId;
-    const sendUrl = `https://graph.facebook.com/v18.0/${targetPhoneId}/messages`;
-
-    await fetch(sendUrl, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${config.whatsapp_access_token}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: fromPhone,
-            type: "text",
-            text: { preview_url: false, body: aiReply },
-        }),
-    });
-
-    console.log(`[WhatsApp Outbound AI] Replied to ${fromPhone}`);
 };
