@@ -9,14 +9,13 @@ export const verifyWhatsAppWebhookService = async (
     token?: string,
     challenge?: string
 ): Promise<string> => {
-    console.log("[WhatsApp Webhook Verification Check]", { mode, token, challenge });
+    if (mode === "subscribe" && token && challenge) {
+        const environmentToken = (process.env.WHATSAPP_CHANNEL_VERIFY || process.env.WHATSAPP_VERIFY_TOKEN || "").trim();
+        const matchesEnvironment = Boolean(environmentToken && token === environmentToken);
+        const matchesWorkspace = Boolean(await WhatsAppConfig.exists({ whatsapp_verify_token: token.trim() }));
 
-    if (mode === "subscribe" && (token || challenge)) {
-        const expectedToken = process.env.WHATSAPP_CHANNEL_VERIFY || process.env.WHATSAPP_VERIFY_TOKEN;
-        if (expectedToken && token !== expectedToken) {
-            throw new Error("Invalid Webhook verification token.");
-        }
-        return challenge || "VERIFIED";
+        if (matchesEnvironment || matchesWorkspace) return challenge;
+        throw new Error("Invalid Webhook verification token.");
     }
 
     throw new Error("Invalid Webhook verification request.");
