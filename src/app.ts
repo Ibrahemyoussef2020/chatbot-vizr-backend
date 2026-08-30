@@ -5,11 +5,9 @@ import morgan from "morgan";
 import { errorHandler, corsMiddleware } from "./middlewares/index.js";
 import appRouter from "./routers/index.js";
 import { AIFactory } from "./core/ai-gateway/ai-gateway.factory.js";
-import { VercelAIProvider } from "./core/ai-gateway/providers/vercel.provider.js";
 import { CustomAIProvider } from "./core/ai-gateway/providers/custom.provider.js";
-import { GoogleAIProvider } from "./core/ai-gateway/providers/google.provider.js";
-import { OpenAIProvider } from "./core/ai-gateway/providers/openai.provider.js";
-import { AnthropicProvider } from "./core/ai-gateway/providers/anthropic.provider.js";
+import { UnifiedAIProvider } from "./core/ai-gateway/providers/unified.provider.js";
+import { createGoogleModel, createOpenAIModel, createAnthropicModel } from "./core/ai-gateway/providers/factories.js";
 import aiRouter from "./core/ai-gateway/ai.route.js";
 
 dotenv.config();
@@ -49,11 +47,11 @@ app.get("/health", (_req, res) => {
 
 
 
-AIFactory.registerProvider('vercel', new VercelAIProvider());
 AIFactory.registerProvider('custom', new CustomAIProvider());
-AIFactory.registerProvider('google', new GoogleAIProvider());
-AIFactory.registerProvider('openai', new OpenAIProvider());
-AIFactory.registerProvider('anthropic', new AnthropicProvider());
+AIFactory.registerProvider('google', new UnifiedAIProvider('google', createGoogleModel));
+AIFactory.registerProvider('openai', new UnifiedAIProvider('openai', createOpenAIModel));
+AIFactory.registerProvider('anthropic', new UnifiedAIProvider('anthropic', createAnthropicModel));
+AIFactory.registerProvider('vercel', new UnifiedAIProvider('openai', createOpenAIModel)); // fallback vercel to openai
 
 if (!process.env.DEFAULT_AI_PROVIDER) {
     process.env.DEFAULT_AI_PROVIDER = 'google';
