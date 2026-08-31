@@ -1,4 +1,6 @@
 import mongoose, { Schema } from "mongoose";
+import { randomUUID } from "node:crypto";
+
 const MessageSchema = new Schema(
     {
         conversationId: {
@@ -19,7 +21,11 @@ const MessageSchema = new Schema(
             required: true,
             index: true,
         },
-        externalMessageId: { type: String, trim: true },
+        externalMessageId: {
+            type: String,
+            trim: true,
+            default: () => `internal:${randomUUID()}`,
+        },
         content: {
             type: String,
             required: true,
