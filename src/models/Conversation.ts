@@ -19,6 +19,15 @@ const ConversationSchema = new Schema(
             default: "brand-ecommerce",
             index: true,
         },
+        receivedFrom: {
+            type: String,
+            enum: ["web", "whatsapp", "telegram", "gmail"],
+            default: "web",
+            required: true,
+            index: true,
+        },
+        externalContactId: { type: String, trim: true },
+        channelAccountId: { type: String, trim: true },
         visitor: {
             name: {
                 type: String,
@@ -67,6 +76,11 @@ const ConversationSchema = new Schema(
         endedAt: Date,
     },
     { timestamps: true },
+);
+
+ConversationSchema.index(
+    { systemSlug: 1, receivedFrom: 1, channelAccountId: 1, externalContactId: 1 },
+    { unique: true, sparse: true },
 );
 
 export default mongoose.model("Conversation", ConversationSchema);

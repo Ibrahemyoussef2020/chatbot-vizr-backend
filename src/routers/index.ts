@@ -5,7 +5,7 @@ import userRouter from "./user.js";
 import landingRouter from "./landing.js";
 import workspaceRouter from "./workspace.js";
 import subscriptionRouter from "./subscription.js";
-import { whatsappWebhookController, publicChatController } from "../controllers/index.js";
+import { whatsappWebhookController, telegramBotController, publicChatController } from "../controllers/index.js";
 import { publicRateLimit } from "../middlewares/publicRateLimit.middleware.js";
 
 const appRouter = Router();
@@ -13,6 +13,7 @@ const appRouter = Router();
 // Public Webhook endpoints for Meta WhatsApp
 appRouter.get("/whatsapp/webhook", whatsappWebhookController.verifyWhatsAppWebhook);
 appRouter.post("/whatsapp/webhook", whatsappWebhookController.handleWhatsAppWebhookEvent);
+appRouter.post("/telegram/webhook/:id", telegramBotController.handleTelegramWebhook);
 
 appRouter.use("/auth", authRouter);
 appRouter.use("/users", userRouter);

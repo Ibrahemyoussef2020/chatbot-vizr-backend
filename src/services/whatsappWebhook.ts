@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { SystemLog, WhatsAppConfig, Workspace } from "../models/index.js";
+import { saveInboundChannelMessage } from "./inboundChannel.js";
 
 /**
  * Verifies Meta Webhook challenge token against stored workspace config.
@@ -86,8 +87,19 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
     if (!config) return;
 
     const workspace = await Workspace.findById(config.workspaceId).exec();
+    if (!workspace) return;
     const alreadyRecorded = await SystemLog.exists({ category: "whatsapp-inbound", "metadata.messageId": message.id });
     if (alreadyRecorded) return;
+    const profileName = value?.contacts?.[0]?.profile?.name || `WhatsApp ${fromPhone}`;
+    await saveInboundChannelMessage({
+        systemSlug: workspace.slug,
+        receivedFrom: "whatsapp",
+        externalContactId: fromPhone,
+        channelAccountId: String(phoneNumberId),
+        externalMessageId: message.id,
+        content: textBody,
+        visitor: { name: profileName, phone: fromPhone },
+    });
     await SystemLog.create({
         publicId: `wa_${randomUUID()}`,
         systemSlug: workspace?.slug || "unknown",

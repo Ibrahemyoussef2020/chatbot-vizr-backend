@@ -12,6 +12,14 @@ const MessageSchema = new Schema(
             enum: ["visitor", "assistant"],
             required: true,
         },
+        receivedFrom: {
+            type: String,
+            enum: ["web", "whatsapp", "telegram", "gmail"],
+            default: "web",
+            required: true,
+            index: true,
+        },
+        externalMessageId: { type: String, trim: true },
         content: {
             type: String,
             required: true,
@@ -30,4 +38,8 @@ const MessageSchema = new Schema(
     { timestamps: true },
 );
 MessageSchema.index({ conversationId: 1, createdAt: 1 });
+MessageSchema.index(
+    { receivedFrom: 1, externalMessageId: 1 },
+    { unique: true, sparse: true },
+);
 export default mongoose.model("Message", MessageSchema);

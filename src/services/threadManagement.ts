@@ -3,7 +3,9 @@ import Message from "../models/Message.js";
 import Workspace from "../models/Workspace.js";
 import { forbiddenError, notFoundError } from "../core/shared/errors/HttpError.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
-import { sendWhatsAppTestMessageService } from "./whatsappConfig.js";
+import "../core/channels/channel.strategies.js";
+import { channelStrategyRegistry } from "../core/channels/channel.registry.js";
+import type { ChannelName } from "../core/channels/channel.types.js";
 
 const resolveWorkspaceSlug = async (
     user: AuthenticatedUserContext,
@@ -67,6 +69,13 @@ export const listFilteredThreads = async (
         query.priority = input.priority.toLowerCase();
     }
 
+    if (input.channel && input.channel !== "all") {
+        // Records created before channel support are web conversations.
+        query.receivedFrom = input.channel === "web"
+            ? { $in: ["web", null] }
+            : input.channel;
+    }
+
     if (input.days && input.days > 0) {
         const startDate = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
         query.createdAt = { $gte: startDate };
@@ -111,6 +120,7 @@ export const listFilteredThreads = async (
             user_email: c.visitor?.email,
             user_phone: c.visitor?.phone,
             system_slug: c.systemSlug,
+            received_from: c.receivedFrom || "web",
             status: c.status === "active" ? "open" : "closed",
             priority: (c as { priority?: string }).priority || "medium",
             assigned_agent: (c as { assignedAgent?: { name: string; email: string } }).assignedAgent,
@@ -153,12 +163,14 @@ export const getThreadMessagesService = async (threadId: string) => {
                 created_at: n.createdAt,
             })),
             system_slug: conversation.systemSlug,
+            received_from: conversation.receivedFrom || "web",
             created_at: conversation.createdAt,
             updated_at: conversation.updatedAt,
         },
         messages: messages.map((m) => ({
             id: String(m._id),
             sender_type: m.senderType,
+            received_from: m.receivedFrom || conversation.receivedFrom || "web",
             content: m.content,
             attachments: m.attachments,
             created_at: m.createdAt,
@@ -283,27 +295,24 @@ export const replyToThreadService = async (
     const conversation = await Conversation.findOne({ publicId: threadId }).exec();
     if (!conversation) throw notFoundError("Thread not found");
 
+    const receivedFrom = (conversation.receivedFrom || "web") as ChannelName;
+    await channelStrategyRegistry.send(receivedFrom, {
+        recipientId: conversation.externalContactId || conversation.visitor?.phone || "",
+        channelAccountId: conversation.channelAccountId || undefined,
+        systemSlug: conversation.systemSlug,
+        content,
+    });
+
     const message = await Message.create({
         conversationId: conversation._id,
         senderType: "assistant",
+        receivedFrom,
         content,
     });
 
     await Conversation.findByIdAndUpdate(conversation._id, {
         $set: { updatedAt: new Date() },
     });
-
-    if (conversation.visitor?.phone) {
-        try {
-            await sendWhatsAppTestMessageService(
-                conversation.visitor.phone,
-                content,
-                conversation.systemSlug
-            );
-        } catch (error: any) {
-            console.error(`[WhatsApp Dispatch Error] Failed to send to ${conversation.visitor.phone}:`, error.message);
-        }
-    }
 
     return {
         id: String(message._id),

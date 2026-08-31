@@ -1,4 +1,5 @@
 import { Workspace, TelegramBot } from "../models/index.js";
+import { saveInboundChannelMessage } from "./inboundChannel.js";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -92,10 +93,56 @@ export const refreshTelegramWebhookService = async (botId: string) => {
     await bot.save();
 
     const serverUrl = process.env.SERVER_URL || "https://chatbot-vizr-backend.vercel.app";
+    const webhookUrl = `${serverUrl.replace(/\/$/, "")}/api/telegram/webhook/${bot._id}`;
+    if (!bot.bot_token || bot.bot_token.includes("demo")) {
+        throw new Error("Telegram Bot Token is using a demo placeholder value.");
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${bot.bot_token}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl, allowed_updates: ["message"] }),
+    });
+    const result: any = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) {
+        throw new Error(`Telegram API Error: ${result?.description || response.statusText}`);
+    }
     return {
         success: true,
-        webhook_url: `${serverUrl}/api/telegram/webhook/${bot._id}`,
+        webhook_url: webhookUrl,
     };
+};
+
+export const handleTelegramWebhookService = async (botId: string, update: any) => {
+    const bot = await TelegramBot.findById(botId).populate("workspaceId").exec();
+    if (!bot) throw new Error("Telegram bot configuration not found.");
+
+    const incoming = update?.message;
+    const text = incoming?.text || incoming?.caption;
+    if (!incoming?.message_id || !incoming?.chat?.id || !text) return;
+
+    const workspace: any = bot.workspaceId;
+    if (!workspace?.slug) throw new Error("Telegram bot workspace not found.");
+
+    const sender = incoming.from || {};
+    const name = [sender.first_name, sender.last_name].filter(Boolean).join(" ")
+        || sender.username
+        || `Telegram ${incoming.chat.id}`;
+
+    await saveInboundChannelMessage({
+        systemSlug: workspace.slug,
+        receivedFrom: "telegram",
+        externalContactId: String(incoming.chat.id),
+        channelAccountId: String(bot._id),
+        externalMessageId: `${bot._id}:${incoming.message_id}`,
+        content: text,
+        visitor: { name },
+    });
+
+    bot.status = "active";
+    bot.error_message = "";
+    bot.last_activity_at = new Date();
+    await bot.save();
 };
 
 export const deleteTelegramBotService = async (botId: string) => {

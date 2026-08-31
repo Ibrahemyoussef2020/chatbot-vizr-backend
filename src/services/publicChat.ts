@@ -40,6 +40,7 @@ export const findOrCreateConversationById = async (
             publicId: targetId || randomUUID(),
             sessionTokenHash: "permanent_no_session_needed",
             systemSlug,
+            receivedFrom: "web",
             status: "active",
             visitor: {
                 name,
@@ -116,6 +117,7 @@ export const sendMessage = async (input: SendMessageInput) => {
     const visitorMessage = await Message.create({
         conversationId: conversation._id,
         senderType: "visitor",
+        receivedFrom: "web",
         content: content || "Sent attachment(s)",
         attachments,
     });
@@ -142,6 +144,7 @@ export const sendMessage = async (input: SendMessageInput) => {
     const assistantMessage = await Message.create({
         conversationId: conversation._id,
         senderType: "assistant",
+        receivedFrom: "web",
         content: replyText,
     });
 
