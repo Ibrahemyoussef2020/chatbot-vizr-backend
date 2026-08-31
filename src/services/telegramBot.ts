@@ -1,6 +1,6 @@
-import { Message, Workspace, TelegramBot } from "../models/index.js";
+import { randomBytes, randomUUID } from "node:crypto";
+import { Conversation, Message, Workspace, TelegramBot } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
-import { randomBytes } from "node:crypto";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -189,7 +189,63 @@ export const deleteTelegramBotService = async (botId: string) => {
     return true;
 };
 
-export const sendTelegramTestMessageService = async (botId: string, chatId: string, text?: string) => {
+const saveOutboundTelegramMessage = async (
+    bot: any,
+    chatId: string,
+    content: string,
+    externalMessageId?: string,
+) => {
+    const workspace = await Workspace.findById(bot.workspaceId).exec();
+    if (!workspace) {
+        throw new Error("Telegram bot workspace not found.");
+    }
+
+    const identity: Record<string, string> = {
+        systemSlug: workspace.slug,
+        receivedFrom: "telegram",
+        channelAccountId: String(bot._id),
+        externalContactId: chatId,
+    };
+
+    let conversation: any = await Conversation.findOne(identity).exec();
+    if (!conversation) {
+        conversation = await Conversation.create({
+            ...identity,
+            publicId: `telegram_${randomUUID()}`,
+            sessionTokenHash: "external_channel",
+            status: "active",
+            visitor: {
+                name: `Telegram ${chatId}`,
+            },
+        });
+    } else if (conversation.status === "ended") {
+        conversation.status = "active";
+        conversation.endedAt = undefined;
+    }
+
+    const message = await Message.create({
+        conversationId: conversation._id,
+        senderType: "assistant",
+        receivedFrom: "telegram",
+        externalMessageId,
+        content,
+    });
+
+    conversation.set("updatedAt", new Date());
+    await conversation.save();
+
+    return {
+        conversationId: conversation.publicId,
+        messageId: String(message._id),
+    };
+};
+
+export const sendTelegramTestMessageService = async (
+    botId: string,
+    chatId: string,
+    text?: string,
+    persistToInbox: boolean = false,
+) => {
     const bot = await TelegramBot.findById(botId).select("+bot_token").exec();
     if (!bot) throw new Error("Telegram bot configuration not found.");
 
@@ -230,13 +286,25 @@ export const sendTelegramTestMessageService = async (botId: string, chatId: stri
     bot.last_activity_at = new Date();
     await bot.save();
 
+    const telegramMessageId = resData?.result?.message_id;
+    const persisted = persistToInbox
+        ? await saveOutboundTelegramMessage(
+            bot,
+            cleanChatId,
+            messageText,
+            telegramMessageId ? `${bot._id}:${telegramMessageId}` : undefined,
+        )
+        : undefined;
+
     return {
         sent: true,
-        message_id: resData?.result?.message_id,
+        message_id: telegramMessageId,
         chat_id: cleanChatId,
         text: messageText,
         bot_username: bot.bot_username,
         routed_via_ai_engine: aiEngine,
+        inbox_thread_id: persisted?.conversationId,
+        inbox_message_id: persisted?.messageId,
         timestamp: new Date().toISOString(),
     };
 };

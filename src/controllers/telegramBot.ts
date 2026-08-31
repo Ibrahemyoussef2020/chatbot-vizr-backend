@@ -74,7 +74,7 @@ export const sendTelegramTestMessage = async (req: Request, res: Response): Prom
     try {
         const botId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
         const { chat_id, text } = req.body;
-        const result = await sendTelegramTestMessageService(botId, chat_id, text);
+        const result = await sendTelegramTestMessageService(botId, chat_id, text, true);
         res.json({ success: true, data: result, message: "Telegram test message sent." });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to send Telegram test message." });
