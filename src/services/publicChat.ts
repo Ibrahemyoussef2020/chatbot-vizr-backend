@@ -128,7 +128,6 @@ export const sendMessage = async (input: SendMessageInput) => {
         systemSlug: conversation.systemSlug,
         channel: "web",
     });
-    const assistantMessage = aiResponse.message;
 
     return {
         message: {
@@ -139,10 +138,10 @@ export const sendMessage = async (input: SendMessageInput) => {
             createdAt: visitorMessage.createdAt,
         },
         reply: {
-            id: assistantMessage._id,
-            senderType: assistantMessage.senderType,
-            content: assistantMessage.content,
-            createdAt: assistantMessage.createdAt,
+            id: aiResponse.id,
+            senderType: aiResponse.senderType,
+            content: aiResponse.content,
+            createdAt: aiResponse.createdAt,
         },
     };
 };
