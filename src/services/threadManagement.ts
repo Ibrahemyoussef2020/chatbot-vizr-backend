@@ -78,7 +78,7 @@ export const listFilteredThreads = async (
 
     if (input.days && input.days > 0) {
         const startDate = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
-        query.createdAt = { $gte: startDate };
+        query.updatedAt = { $gte: startDate };
     }
 
     if (input.search && input.search.trim()) {
@@ -96,8 +96,8 @@ export const listFilteredThreads = async (
     const skip = (page - 1) * limit;
 
     let sortOption: Record<string, 1 | -1> = { updatedAt: -1 };
-    if (input.sort === "oldest") sortOption = { createdAt: 1 };
-    else if (input.sort === "newest") sortOption = { createdAt: -1 };
+    if (input.sort === "oldest") sortOption = { updatedAt: 1 };
+    else if (input.sort === "newest") sortOption = { updatedAt: -1 };
 
     const [total, conversations] = await Promise.all([
         Conversation.countDocuments(query),
@@ -109,18 +109,31 @@ export const listFilteredThreads = async (
             .exec(),
     ]);
 
+    const latestMessages = await Message.aggregate([
+        { $match: { conversationId: { $in: conversations.map((conversation) => conversation._id) } } },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: "$conversationId", message: { $first: "$$ROOT" } } },
+    ]).exec();
+    const latestMessageByConversation = new Map(
+        latestMessages.map((item) => [String(item._id), item.message]),
+    );
+
     return {
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit) || 1,
-        threads: conversations.map((c) => ({
+        threads: conversations.map((c) => {
+            const latestMessage = latestMessageByConversation.get(String(c._id));
+            return ({
             id: c.publicId,
             user_name: c.visitor?.name || "Guest User",
             user_email: c.visitor?.email,
             user_phone: c.visitor?.phone,
             system_slug: c.systemSlug,
             received_from: c.receivedFrom || "web",
+            latest_message: latestMessage?.content || "No messages yet",
+            latest_message_at: latestMessage?.createdAt || c.updatedAt,
             status: c.status === "active" ? "open" : "closed",
             priority: (c as { priority?: string }).priority || "medium",
             assigned_agent: (c as { assignedAgent?: { name: string; email: string } }).assignedAgent,
@@ -133,7 +146,7 @@ export const listFilteredThreads = async (
             })),
             created_at: c.createdAt,
             updated_at: c.updatedAt,
-        })),
+        }); }),
     };
 };
 
