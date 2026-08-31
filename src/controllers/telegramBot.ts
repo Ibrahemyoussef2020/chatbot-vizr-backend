@@ -11,7 +11,8 @@ import {
 export const handleTelegramWebhook = async (req: Request, res: Response): Promise<void> => {
     try {
         const botId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        await handleTelegramWebhookService(botId, req.body);
+        const secret = req.get("X-Telegram-Bot-Api-Secret-Token");
+        await handleTelegramWebhookService(botId, req.body, secret);
         res.status(200).send("OK");
     } catch (error: any) {
         console.error("[Telegram Webhook Error]", error.message);
@@ -37,7 +38,13 @@ export const listTelegramBots = async (req: Request, res: Response): Promise<voi
 export const createTelegramBot = async (req: Request, res: Response): Promise<void> => {
     try {
         const bot = await createTelegramBotService(req.body);
-        res.json({ success: true, data: bot, message: "Telegram Bot & Webhook registered successfully." });
+        res.status(201).json({
+            success: true,
+            data: bot,
+            message: bot.status === "active"
+                ? "Telegram bot verified and webhook registered successfully."
+                : "Telegram bot verified, but webhook registration needs attention.",
+        });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to register Telegram bot." });
     }

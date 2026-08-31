@@ -1,5 +1,6 @@
-import { Workspace, TelegramBot } from "../models/index.js";
+import { Message, Workspace, TelegramBot } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
+import { randomBytes } from "node:crypto";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -11,28 +12,14 @@ const resolveWorkspace = async (slug?: string) => {
 export const listTelegramBotsService = async (systemSlug?: string) => {
     const ws = await resolveWorkspace(systemSlug);
     const filter = ws ? { workspaceId: ws._id } : {};
-    let bots = await TelegramBot.find(filter).populate("workspaceId").exec();
-
-    if (bots.length === 0 && ws) {
-        const seeded = await TelegramBot.create({
-            workspaceId: ws._id,
-            bot_token: "7123456789:AAEF_demo_telegram_bot_token_2026",
-            bot_name: `${ws.name} Telegram Bot`,
-            bot_username: `${ws.slug}_support_bot`,
-            ai_engine_type: "openai_api",
-            internal_server_url: "http://localhost:11434/v1",
-            openai_api_key: "sk-proj-demo-telegram-key",
-            status: "active",
-            last_activity_at: new Date(),
-        });
-        bots = [seeded];
-    }
+    const bots = await TelegramBot.find(filter).populate("workspaceId").exec();
 
     return bots.map((b: any) => ({
         id: b._id.toString(),
-        bot_token: b.bot_token,
+        telegram_bot_id: b.telegram_bot_id,
         bot_name: b.bot_name,
         bot_username: b.bot_username,
+        welcome_message: b.welcome_message || "",
         ai_engine_type: b.ai_engine_type || "openai_api",
         internal_server_url: b.internal_server_url || "http://localhost:11434/v1",
         openai_api_key: b.openai_api_key || "",
@@ -53,6 +40,7 @@ export const createTelegramBotService = async (payload: {
     ai_engine_type?: "internal_server" | "openai_api";
     internal_server_url?: string;
     openai_api_key?: string;
+    welcome_message?: string;
 }) => {
     let ws = await Workspace.findById(payload.system_id).exec();
     if (!ws) {
@@ -60,62 +48,96 @@ export const createTelegramBotService = async (payload: {
     }
     if (!ws) throw new Error("Target system workspace not found.");
 
-    const tokenParts = payload.bot_token.split(":");
-    const botNum = tokenParts[0] || "bot";
+    const token = payload.bot_token?.trim();
+    if (!/^\d+:[A-Za-z0-9_-]{20,}$/.test(token || "")) {
+        throw new Error("Invalid Telegram bot token format. Copy the complete token from @BotFather.");
+    }
+
+    const identityResponse = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const identity: any = await identityResponse.json().catch(() => ({}));
+    if (!identityResponse.ok || !identity.ok || !identity.result?.id) {
+        throw new Error(`Telegram token verification failed: ${identity?.description || identityResponse.statusText}`);
+    }
+
+    const telegramBotId = String(identity.result.id);
+    if (await TelegramBot.exists({ telegram_bot_id: telegramBotId })) {
+        throw new Error(`@${identity.result.username || telegramBotId} is already connected.`);
+    }
 
     const bot = await TelegramBot.create({
         workspaceId: ws._id,
-        bot_token: payload.bot_token,
-        bot_name: `${ws.name} Bot (${botNum})`,
-        bot_username: `${ws.slug}_${botNum.slice(-4)}_bot`,
+        bot_token: token,
+        telegram_bot_id: telegramBotId,
+        webhook_secret: randomBytes(24).toString("hex"),
+        bot_name: identity.result.first_name || `${ws.name} Telegram Bot`,
+        bot_username: identity.result.username || "",
+        welcome_message: payload.welcome_message?.trim() || "Hi! Thanks for contacting us. How can we help?",
         ai_engine_type: payload.ai_engine_type || "openai_api",
         internal_server_url: payload.internal_server_url || "http://localhost:11434/v1",
         openai_api_key: payload.openai_api_key || "",
-        status: "active",
+        status: "pending",
         last_activity_at: new Date(),
     });
+
+    let webhookUrl = "";
+    try {
+        const webhook = await registerTelegramWebhook(bot);
+        webhookUrl = webhook.webhook_url;
+    } catch (error: any) {
+        bot.status = "error";
+        bot.error_message = error.message;
+        await bot.save();
+    }
 
     return {
         id: bot._id.toString(),
         bot_name: bot.bot_name,
         bot_username: bot.bot_username,
         status: bot.status,
+        error_message: bot.error_message,
+        webhook_url: webhookUrl,
     };
 };
 
-export const refreshTelegramWebhookService = async (botId: string) => {
-    const bot = await TelegramBot.findById(botId).exec();
-    if (!bot) throw new Error("Bot not found.");
-
-    bot.status = "active";
-    bot.error_message = "";
-    bot.last_activity_at = new Date();
-    await bot.save();
-
-    const serverUrl = process.env.SERVER_URL || "https://chatbot-vizr-backend.vercel.app";
-    const webhookUrl = `${serverUrl.replace(/\/$/, "")}/api/telegram/webhook/${bot._id}`;
-    if (!bot.bot_token || bot.bot_token.includes("demo")) {
-        throw new Error("Telegram Bot Token is using a demo placeholder value.");
-    }
-
+const registerTelegramWebhook = async (bot: any) => {
+    const serverUrl = (process.env.SERVER_URL || "https://chatbot-vizr-backend.vercel.app").replace(/\/$/, "");
+    if (!serverUrl.startsWith("https://")) throw new Error("SERVER_URL must be a public HTTPS URL for Telegram webhooks.");
+    if (!bot.webhook_secret) bot.webhook_secret = randomBytes(24).toString("hex");
+    const webhookUrl = `${serverUrl}/api/telegram/webhook/${bot._id}`;
     const response = await fetch(`https://api.telegram.org/bot${bot.bot_token}/setWebhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: webhookUrl, allowed_updates: ["message"] }),
+        body: JSON.stringify({
+            url: webhookUrl,
+            secret_token: bot.webhook_secret,
+            allowed_updates: ["message"],
+            drop_pending_updates: false,
+        }),
     });
     const result: any = await response.json().catch(() => ({}));
     if (!response.ok || !result.ok) {
         throw new Error(`Telegram API Error: ${result?.description || response.statusText}`);
     }
-    return {
-        success: true,
-        webhook_url: webhookUrl,
-    };
+    bot.status = "active";
+    bot.error_message = "";
+    bot.last_activity_at = new Date();
+    await bot.save();
+    return { success: true, webhook_url: webhookUrl };
 };
 
-export const handleTelegramWebhookService = async (botId: string, update: any) => {
-    const bot = await TelegramBot.findById(botId).populate("workspaceId").exec();
+export const refreshTelegramWebhookService = async (botId: string) => {
+    const bot = await TelegramBot.findById(botId).select("+bot_token +webhook_secret").exec();
+    if (!bot) throw new Error("Bot not found.");
+
+    return registerTelegramWebhook(bot);
+};
+
+export const handleTelegramWebhookService = async (botId: string, update: any, providedSecret?: string) => {
+    const bot = await TelegramBot.findById(botId).select("+bot_token +webhook_secret").populate("workspaceId").exec();
     if (!bot) throw new Error("Telegram bot configuration not found.");
+    if (!bot.webhook_secret || providedSecret !== bot.webhook_secret) {
+        throw new Error("Invalid Telegram webhook secret.");
+    }
 
     const incoming = update?.message;
     const text = incoming?.text || incoming?.caption;
@@ -129,7 +151,7 @@ export const handleTelegramWebhookService = async (botId: string, update: any) =
         || sender.username
         || `Telegram ${incoming.chat.id}`;
 
-    await saveInboundChannelMessage({
+    const saved = await saveInboundChannelMessage({
         systemSlug: workspace.slug,
         receivedFrom: "telegram",
         externalContactId: String(incoming.chat.id),
@@ -139,6 +161,16 @@ export const handleTelegramWebhookService = async (botId: string, update: any) =
         visitor: { name },
     });
 
+    if (saved.conversationCreated && saved.conversation && bot.welcome_message?.trim()) {
+        await sendTelegramTestMessageService(String(bot._id), String(incoming.chat.id), bot.welcome_message.trim());
+        await Message.create({
+            conversationId: saved.conversation._id,
+            senderType: "assistant",
+            receivedFrom: "telegram",
+            content: bot.welcome_message.trim(),
+        });
+    }
+
     bot.status = "active";
     bot.error_message = "";
     bot.last_activity_at = new Date();
@@ -146,12 +178,19 @@ export const handleTelegramWebhookService = async (botId: string, update: any) =
 };
 
 export const deleteTelegramBotService = async (botId: string) => {
-    await TelegramBot.findByIdAndDelete(botId).exec();
+    const bot = await TelegramBot.findById(botId).select("+bot_token").exec();
+    if (!bot) return true;
+    await fetch(`https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drop_pending_updates: false }),
+    }).catch(() => undefined);
+    await bot.deleteOne();
     return true;
 };
 
 export const sendTelegramTestMessageService = async (botId: string, chatId: string, text?: string) => {
-    const bot = await TelegramBot.findById(botId).exec();
+    const bot = await TelegramBot.findById(botId).select("+bot_token").exec();
     if (!bot) throw new Error("Telegram bot configuration not found.");
 
     if (!bot.bot_token || bot.bot_token.includes("demo")) {

@@ -27,6 +27,7 @@ export const saveInboundChannelMessage = async (input: SaveInboundChannelMessage
     };
 
     let conversation = await Conversation.findOne(identity).exec();
+    const conversationCreated = !conversation;
     if (!conversation) {
         conversation = await Conversation.create({
             ...identity,
@@ -50,5 +51,5 @@ export const saveInboundChannelMessage = async (input: SaveInboundChannelMessage
 
     conversation.set("updatedAt", new Date());
     await conversation.save();
-    return { conversation, message, duplicate: false };
+    return { conversation, message, duplicate: false, conversationCreated };
 };
