@@ -309,19 +309,24 @@ export const replyToThreadService = async (
     if (!conversation) throw notFoundError("Thread not found");
 
     const receivedFrom = (conversation.receivedFrom || "web") as ChannelName;
-    await channelStrategyRegistry.send(receivedFrom, {
-        recipientId: conversation.externalContactId || conversation.visitor?.phone || "",
-        channelAccountId: conversation.channelAccountId || undefined,
-        systemSlug: conversation.systemSlug,
-        content,
-    });
-
     const message = await Message.create({
         conversationId: conversation._id,
         senderType: "assistant",
         receivedFrom,
         content,
     });
+
+    try {
+        await channelStrategyRegistry.send(receivedFrom, {
+            recipientId: conversation.externalContactId || conversation.visitor?.phone || "",
+            channelAccountId: conversation.channelAccountId || undefined,
+            systemSlug: conversation.systemSlug,
+            content,
+        });
+    } catch (error) {
+        await Message.findByIdAndDelete(message._id);
+        throw error;
+    }
 
     await Conversation.findByIdAndUpdate(conversation._id, {
         $set: { updatedAt: new Date() },
