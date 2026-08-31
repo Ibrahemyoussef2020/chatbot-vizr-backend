@@ -125,15 +125,23 @@ export const sendMessage = async (input: SendMessageInput) => {
     const providerName = (process.env.DEFAULT_AI_PROVIDER || "vercel").trim();
     const aiService = AIFactory.getProvider(providerName);
 
-    const previousMessages = await Message.find({ conversationId: conversation._id })
-        .sort({ createdAt: 1 })
-        .limit(10)
+    const previousMessages = await Message.find({
+        conversationId: conversation._id,
+        _id: { $ne: visitorMessage._id },
+    })
+        .sort({ createdAt: -1 })
+        .limit(9)
         .lean();
 
-    const formattedMessages = previousMessages.map((m) => ({
+    const formattedMessages = previousMessages.reverse().map((m) => ({
         role: m.senderType === "visitor" ? ("user" as const) : ("assistant" as const),
         content: m.content,
     }));
+
+    formattedMessages.push({
+        role: "user",
+        content: visitorMessage.content,
+    });
 
     const replyText = await aiService.generate(formattedMessages, {
         systemPrompt: `You are Vizr AI, a helpful, friendly, and concise customer support assistant for workspace "${conversation.systemSlug}". Assist the user politely and answer their questions directly.`,
