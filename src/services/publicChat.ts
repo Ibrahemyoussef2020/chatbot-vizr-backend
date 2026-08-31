@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
-import { AIFactory } from "../core/ai-gateway/ai-gateway.factory.js";
+import { generateChannelAiResponse } from "./channelAiResponse.js";
 
 // Permanent ID lookup helper (never expires, auto-creates if missing by ID)
 export const findOrCreateConversationById = async (
@@ -122,39 +122,13 @@ export const sendMessage = async (input: SendMessageInput) => {
         attachments,
     });
 
-    const providerName = (process.env.DEFAULT_AI_PROVIDER || "vercel").trim();
-    const aiService = AIFactory.getProvider(providerName);
-
-    const previousMessages = await Message.find({
-        conversationId: conversation._id,
-        _id: { $ne: visitorMessage._id },
-    })
-        .sort({ createdAt: -1 })
-        .limit(9)
-        .lean();
-
-    const formattedMessages = previousMessages.reverse().map((m) => ({
-        role: m.senderType === "visitor" ? ("user" as const) : ("assistant" as const),
-        content: m.content,
-    }));
-
-    formattedMessages.push({
-        role: "user",
-        content: visitorMessage.content,
+    const aiResponse = await generateChannelAiResponse({
+        conversationId: String(conversation._id),
+        inboundMessageId: String(visitorMessage._id),
+        systemSlug: conversation.systemSlug,
+        channel: "web",
     });
-
-    const replyText = await aiService.generate(formattedMessages, {
-        systemPrompt: `You are Vizr AI, a helpful, friendly, and concise customer support assistant for workspace "${conversation.systemSlug}". Assist the user politely and answer their questions directly.`,
-    });
-
-
-
-    const assistantMessage = await Message.create({
-        conversationId: conversation._id,
-        senderType: "assistant",
-        receivedFrom: "web",
-        content: replyText,
-    });
+    const assistantMessage = aiResponse.message;
 
     return {
         message: {
