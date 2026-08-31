@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
-import { generateChannelAiResponse } from "./channelAiResponse.js";
+import { sendReply } from "./reply.js";
 
 // Permanent ID lookup helper (never expires, auto-creates if missing by ID)
 export const findOrCreateConversationById = async (
@@ -122,7 +122,8 @@ export const sendMessage = async (input: SendMessageInput) => {
         attachments,
     });
 
-    const aiResponse = await generateChannelAiResponse({
+    const aiResponse = await sendReply({
+        type: "ai",
         conversationId: String(conversation._id),
         inboundMessageId: String(visitorMessage._id),
         systemSlug: conversation.systemSlug,

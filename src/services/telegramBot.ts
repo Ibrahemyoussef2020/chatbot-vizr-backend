@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { Conversation, Message, Workspace, TelegramBot } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
-import { generateChannelAiResponse } from "./channelAiResponse.js";
+import { sendReply } from "./reply.js";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -163,7 +163,8 @@ export const handleTelegramWebhookService = async (botId: string, update: any, p
     });
 
     if (!saved.duplicate && saved.conversation) {
-        await generateChannelAiResponse({
+        await sendReply({
+            type: "ai",
             conversationId: String(saved.conversation._id),
             inboundMessageId: String(saved.message._id),
             systemSlug: workspace.slug,

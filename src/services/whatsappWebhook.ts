@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { SystemLog, WhatsAppConfig, Workspace } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
-import { generateChannelAiResponse } from "./channelAiResponse.js";
+import { sendReply } from "./reply.js";
 import { sendWhatsAppTestMessageService } from "./whatsappConfig.js";
 
 /**
@@ -104,7 +104,8 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
     });
 
     if (!saved.duplicate && saved.conversation) {
-        await generateChannelAiResponse({
+        await sendReply({
+            type: "ai",
             conversationId: String(saved.conversation._id),
             inboundMessageId: String(saved.message._id),
             systemSlug: workspace.slug,

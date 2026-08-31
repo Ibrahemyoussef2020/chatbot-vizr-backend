@@ -5,7 +5,7 @@ import { forbiddenError, notFoundError } from "../core/shared/errors/HttpError.j
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import "../core/channels/channel.strategies.js";
 import type { ChannelName } from "../core/channels/channel.types.js";
-import { ReplyStrategyFactory } from "../core/replies/reply-strategy.factory.js";
+import { sendReply } from "./reply.js";
 
 const resolveWorkspaceSlug = async (
     user: AuthenticatedUserContext,
@@ -309,8 +309,7 @@ export const replyToThreadService = async (
     if (!conversation) throw notFoundError("Thread not found");
 
     const receivedFrom = (conversation.receivedFrom || "web") as ChannelName;
-    const strategy = ReplyStrategyFactory.create("agent");
-    const message = await strategy.reply({
+    const message = await sendReply({
         type: "agent",
         conversationId: String(conversation._id),
         systemSlug: conversation.systemSlug,
