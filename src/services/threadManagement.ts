@@ -55,6 +55,13 @@ export const listFilteredThreads = async (
     const systemSlug = await resolveWorkspaceSlug(user, input.systemSlug);
     const query: Record<string, unknown> = {};
 
+    query.$and = [{
+        $or: [
+            { receivedFrom: { $ne: "gmail" } },
+            { "channelMetadata.originatedByVizr": true },
+        ],
+    }];
+
     if (systemSlug && systemSlug !== "all") {
         query.$or = [{ systemSlug }, { systemSlug: "demo" }];
     }

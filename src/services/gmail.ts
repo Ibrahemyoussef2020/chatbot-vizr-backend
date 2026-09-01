@@ -230,7 +230,61 @@ export const sendGmailTestMessage = async (
         method: "POST",
         body: JSON.stringify({ raw }),
     });
-    return { sent: true, message_id: sent.id, thread_id: sent.threadId, recipient: cleanRecipient };
+    const workspace = await Workspace.findById(connection.workspaceId).exec();
+    if (!workspace) throw notFoundError("Gmail workspace not found.");
+
+    const identity = {
+        systemSlug: workspace.slug,
+        receivedFrom: "gmail" as const,
+        channelAccountId: String(connection._id),
+        externalContactId: cleanRecipient,
+    };
+    let conversation: any = await Conversation.findOne(identity).exec();
+    if (!conversation) {
+        conversation = await Conversation.create({
+            ...identity,
+            publicId: `gmail_${randomUUID()}`,
+            sessionTokenHash: "external_channel",
+            status: "active",
+            visitor: {
+                name: cleanRecipient,
+                email: cleanRecipient,
+            },
+        });
+    }
+
+    conversation.status = "active";
+    conversation.endedAt = undefined;
+    const existingMetadata = conversation.get("channelMetadata") || {};
+    const trackedThreadIds = Array.from(new Set([
+        ...(existingMetadata.threadIds || []),
+        existingMetadata.threadId,
+        sent.threadId,
+    ].filter(Boolean)));
+    conversation.set("channelMetadata", {
+        originatedByVizr: true,
+        subject: subject.trim(),
+        threadId: sent.threadId,
+        threadIds: trackedThreadIds,
+    });
+    await conversation.save();
+
+    const outboundMessage = await Message.create({
+        conversationId: conversation._id,
+        senderType: "assistant",
+        receivedFrom: "gmail",
+        externalMessageId: `gmail-sent:${sent.id}`,
+        content: content.trim(),
+    });
+
+    return {
+        sent: true,
+        message_id: sent.id,
+        thread_id: sent.threadId,
+        inbox_thread_id: conversation.publicId,
+        inbox_message_id: String(outboundMessage._id),
+        recipient: cleanRecipient,
+    };
 };
 
 const processGmailMessage = async (connection: any, workspace: any, messageId: string) => {
@@ -238,6 +292,19 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
     if (!(gmailMessage.labelIds || []).includes("INBOX")) return;
     const from = emailFromHeader(header(gmailMessage, "From")).toLowerCase();
     if (!from || from === connection.email.toLowerCase()) return;
+    const trackedConversation: any = await Conversation.findOne({
+        systemSlug: workspace.slug,
+        receivedFrom: "gmail",
+        channelAccountId: String(connection._id),
+        externalContactId: from,
+        "channelMetadata.originatedByVizr": true,
+        $or: [
+            { "channelMetadata.threadId": gmailMessage.threadId },
+            { "channelMetadata.threadIds": gmailMessage.threadId },
+        ],
+    }).exec();
+    if (!trackedConversation) return;
+
     const content = findBody(gmailMessage.payload) || gmailMessage.snippet || "[Email without text body]";
     const saved = await saveInboundChannelMessage({
         systemSlug: workspace.slug,
@@ -249,11 +316,14 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
         visitor: { name: header(gmailMessage, "From") || from, email: from },
     });
     if (saved.duplicate || !saved.conversation) return;
+    const existingMetadata = saved.conversation.get("channelMetadata") || {};
     saved.conversation.set("channelMetadata", {
+        originatedByVizr: true,
         subject: header(gmailMessage, "Subject"),
         messageId: header(gmailMessage, "Message-ID"),
         references: header(gmailMessage, "References"),
         threadId: gmailMessage.threadId,
+        threadIds: existingMetadata.threadIds || [gmailMessage.threadId],
     });
     await saved.conversation.save();
     await sendReply({
