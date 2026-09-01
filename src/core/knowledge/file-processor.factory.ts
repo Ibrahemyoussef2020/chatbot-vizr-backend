@@ -1,6 +1,4 @@
 import { extname } from "node:path";
-import { PDFParse } from "pdf-parse";
-import * as XLSX from "xlsx";
 import { unprocessableEntityError } from "../shared/errors/HttpError.js";
 
 export type KnowledgeSourceKind = "pdf" | "audio" | "video" | "excel" | "text";
@@ -20,6 +18,7 @@ class TextProcessor implements KnowledgeFileProcessor {
 class PdfProcessor implements KnowledgeFileProcessor {
     readonly kind = "pdf" as const;
     async process(file: Express.Multer.File) {
+        const { PDFParse } = await import("pdf-parse");
         const parser = new PDFParse({ data: file.buffer });
         try {
             const result = await parser.getText();
@@ -33,6 +32,7 @@ class PdfProcessor implements KnowledgeFileProcessor {
 class ExcelProcessor implements KnowledgeFileProcessor {
     readonly kind = "excel" as const;
     async process(file: Express.Multer.File) {
+        const XLSX = await import("xlsx");
         const workbook = XLSX.read(file.buffer, { type: "buffer" });
         const text = workbook.SheetNames.map((name) => {
             const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
