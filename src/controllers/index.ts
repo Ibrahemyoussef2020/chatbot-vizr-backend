@@ -16,6 +16,7 @@ import * as whatsappConfigController from "./whatsappConfig.js";
 import * as telegramBotController from "./telegramBot.js";
 import * as whatsappWebhookController from "./whatsappWebhook.js";
 import * as gmailController from "./gmail.js";
+import * as knowledgeBaseController from "./knowledgeBase.js";
 
 import * as dashboardOverviewController from "./dashboardOverview.js";
 import * as dashboardAnalyticsController from "./dashboardAnalytics.js";
@@ -39,6 +40,7 @@ export {
     telegramBotController,
     whatsappWebhookController,
     gmailController,
+    knowledgeBaseController,
     dashboardOverviewController,
     dashboardAnalyticsController,
     threadManagementController,

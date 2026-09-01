@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import {
     workspaceController,
     tokenLogController,
@@ -14,11 +15,19 @@ import {
     dashboardAnalyticsController,
     threadManagementController,
     gmailController,
+    knowledgeBaseController,
 } from "../controllers/index.js";
 import { authenticate, validateRequest } from "../middlewares/index.js";
 import { createWorkspaceValidator, updateWorkspaceValidator } from "../validator/index.js";
 
 const workspaceRouter = Router();
+const knowledgeUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 25 * 1024 * 1024,
+        files: 10,
+    },
+});
 
 workspaceRouter.use(authenticate);
 
@@ -100,6 +109,17 @@ workspaceRouter.get("/gmail/status", gmailController.status);
 workspaceRouter.post("/gmail/watch", gmailController.renewWatch);
 workspaceRouter.delete("/gmail/disconnect", gmailController.disconnect);
 workspaceRouter.post("/gmail/test-message", gmailController.testMessage);
+
+// Knowledge Base sessions, sources, and grounded chat
+workspaceRouter.get("/knowledge/sessions", knowledgeBaseController.listSessions);
+workspaceRouter.post("/knowledge/sessions", knowledgeBaseController.createSession);
+workspaceRouter.get("/knowledge/sessions/:id", knowledgeBaseController.showSession);
+workspaceRouter.post(
+    "/knowledge/sessions/:id/sources",
+    knowledgeUpload.array("files", 10),
+    knowledgeBaseController.uploadSources,
+);
+workspaceRouter.post("/knowledge/sessions/:id/chat", knowledgeBaseController.chat);
 
 // Security & Roles
 workspaceRouter.get("/security/roles", securityRoleController.getRoles);

@@ -13,6 +13,9 @@ import SecurityRole from "./SecurityRole.js";
 import WhatsAppConfig from "./WhatsAppConfig.js";
 import TelegramBot from "./TelegramBot.js";
 import GmailConnection from "./GmailConnection.js";
+import KnowledgeSession from "./KnowledgeSession.js";
+import KnowledgeSource from "./KnowledgeSource.js";
+import KnowledgeChatMessage from "./KnowledgeChatMessage.js";
 
 export {
     User,
@@ -30,4 +33,7 @@ export {
     WhatsAppConfig,
     TelegramBot,
     GmailConnection,
+    KnowledgeSession,
+    KnowledgeSource,
+    KnowledgeChatMessage,
 };
