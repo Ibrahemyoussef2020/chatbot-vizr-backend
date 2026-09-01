@@ -2,8 +2,9 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import connectDB from "../db/index.js";
 import { seedConversations } from "./conversation.seeder.js";
-import { assignAdminWorkspace, seedAdminUser, seedAgentUser } from "./user.seeder.js";
-import { seedWorkspace } from "./workspace.seeder.js";
+import { assignUserWorkspace, seedAgentUser, seedBusinessOwner, seedWorkspaceOwners } from "./user.seeder.js";
+import { seedWorkspaces } from "./workspace.seeder.js";
+import { seedConfig } from "./config.js";
 import { seedTokenLogs } from "./tokenLog.seeder.js";
 import { seedTags } from "./tag.seeder.js";
 import { seedSystemLogs } from "./systemLog.seeder.js";
@@ -11,15 +12,23 @@ import { seedSystemLogs } from "./systemLog.seeder.js";
 const runSeeders = async () => {
     await connectDB();
 
-    console.log("Seeding admin user...");
-    const admin = await seedAdminUser();
+    console.log("Seeding Vizr business owner and client workspace owners...");
+    const businessOwner = await seedBusinessOwner();
+    const clientOwners = await seedWorkspaceOwners();
 
-    console.log("Seeding workspace...");
-    const workspace = await seedWorkspace(admin._id);
+    console.log("Seeding business-owned and client-owned workspaces...");
+    const workspaces = await seedWorkspaces(businessOwner._id, clientOwners);
 
-    console.log("Assigning workspace users...");
-    await assignAdminWorkspace(admin._id, workspace._id);
-    await seedAgentUser(workspace._id);
+    console.log("Assigning each owner to the correct workspace...");
+    const firstBusinessWorkspace = workspaces.find((workspace) => workspace.slug === "brand-ecommerce");
+    if (!firstBusinessWorkspace) throw new Error("Brand business workspace was not seeded.");
+    await assignUserWorkspace(businessOwner._id, firstBusinessWorkspace._id);
+    for (const account of seedConfig.users.workspaceOwners) {
+        const owner = clientOwners.get(account.key);
+        const workspace = workspaces.find((item) => item.ownerId.equals(owner?._id));
+        if (owner && workspace) await assignUserWorkspace(owner._id, workspace._id);
+    }
+    await seedAgentUser(firstBusinessWorkspace._id);
 
     console.log("Seeding dashboard conversations and messages...");
     const convResult = await seedConversations();
@@ -34,7 +43,7 @@ const runSeeders = async () => {
     const logResult = await seedSystemLogs();
 
     console.log(
-        `Seed complete: ${workspace.name} (${convResult.conversations} conversations, ${tokenResult.tokenLogs} token logs, ${tagResult.tags} tags, ${logResult.logs} logs).`,
+        `Seed complete: ${workspaces.length} workspaces (${convResult.conversations} conversations, ${tokenResult.tokenLogs} token logs, ${tagResult.tags} tags, ${logResult.logs} logs).`,
     );
 };
 

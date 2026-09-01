@@ -24,7 +24,7 @@ export const seedConversations = async () => {
             { publicId: seed.publicId },
             {
                 $set: {
-                    systemSlug: seed.systemSlug || seedConfig.workspace.slug,
+                    systemSlug: seed.systemSlug || seedConfig.workspaces[0].slug,
                     visitor: seed.visitor,
                     priority: seed.priority,
                     assignedAgent: seed.assignedAgent,
