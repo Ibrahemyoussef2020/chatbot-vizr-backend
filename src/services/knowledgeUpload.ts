@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
 import { duplicateDisposition, validateUploadDescriptor } from "../core/knowledge/upload-policy.js";
 import { conflictError, forbiddenError, internalServerError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
-import { createDirectUploadAuthorization, destroyCloudinaryAsset, verifyCloudinaryAsset } from "../lib/cloudinary.js";
+import { createDirectUploadAuthorization, destroyCloudinaryAsset, verifyCloudinaryAsset, type CloudinaryAsset } from "../lib/cloudinary.js";
 import { KnowledgeSession, KnowledgeSource, KnowledgeUpload } from "../models/index.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import { getWorkspace } from "./workspaces.js";
@@ -118,12 +118,8 @@ export const recordKnowledgeUploadProgress = async (user: AuthenticatedUserConte
     return serialize(upload);
 };
 
-export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, uploadId: string) => {
-    assertKnowledgeManager(user);
-    const { workspace, upload } = await scopedUpload(user, workspaceSlug, sessionId, uploadId);
+const finalizeVerifiedUpload = async (upload: any, asset: CloudinaryAsset) => {
     if (upload.status === "COMPLETED") return serialize(upload);
-    if (upload.status === "CANCELLED") throw conflictError("A cancelled upload cannot be completed.");
-    const asset = await verifyCloudinaryAsset(upload.resourceType, upload.publicId);
     if (asset.public_id !== upload.publicId || asset.bytes !== upload.size) {
         upload.status = "FAILED";
         upload.errorCode = "ASSET_MISMATCH";
@@ -132,11 +128,10 @@ export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, wo
         await destroyCloudinaryAsset(upload.resourceType, upload.publicId).catch(() => undefined);
         throw unprocessableEntityError(upload.errorMessage);
     }
-
     try {
         const source = await SourceModel.findOneAndUpdate(
-            { workspaceId: workspace.id, uploadId },
-            { $setOnInsert: { workspaceId: workspace.id, sessionId, name: upload.fileName, mimeType: upload.mimeType, kind: upload.kind, size: upload.size, status: "processing", uploadId, cloudinaryAssetId: asset.asset_id, cloudinaryPublicId: asset.public_id, secureUrl: asset.secure_url } },
+            { workspaceId: upload.workspaceId, uploadId: upload.uploadId },
+            { $setOnInsert: { workspaceId: upload.workspaceId, sessionId: upload.sessionId, name: upload.fileName, mimeType: upload.mimeType, kind: upload.kind, size: upload.size, status: "processing", uploadId: upload.uploadId, cloudinaryAssetId: asset.asset_id, cloudinaryPublicId: asset.public_id, secureUrl: asset.secure_url } },
             { upsert: true, new: true },
         ).exec();
         if (!source) throw internalServerError("Knowledge source metadata could not be created.");
@@ -148,7 +143,6 @@ export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, wo
         await upload.save().catch(() => undefined);
         throw error;
     }
-
     upload.status = "COMPLETED";
     upload.assetId = asset.asset_id;
     upload.secureUrl = asset.secure_url;
@@ -158,11 +152,30 @@ export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, wo
     upload.expiresAt = undefined;
     await upload.save();
     const [sourceCount, readySourceCount] = await Promise.all([
-        SourceModel.countDocuments({ sessionId }),
-        SourceModel.countDocuments({ sessionId, status: "ready" }),
+        SourceModel.countDocuments({ sessionId: upload.sessionId }),
+        SourceModel.countDocuments({ sessionId: upload.sessionId, status: "ready" }),
     ]);
-    await SessionModel.updateOne({ _id: sessionId }, { sourceCount, readySourceCount, status: "processing" });
+    await SessionModel.updateOne({ _id: upload.sessionId }, { sourceCount, readySourceCount, status: "processing" });
     return serialize(upload);
+};
+
+export const completeKnowledgeUploadFromWebhook = async (asset: CloudinaryAsset) => {
+    const upload = await UploadModel.findOne({ publicId: asset.public_id }).exec();
+    if (!upload) return { ignored: true };
+    if (upload.status === "CANCELLED") {
+        await destroyCloudinaryAsset(upload.resourceType, upload.publicId).catch(() => undefined);
+        return { ignored: true };
+    }
+    return finalizeVerifiedUpload(upload, asset);
+};
+
+export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, uploadId: string) => {
+    assertKnowledgeManager(user);
+    const { upload } = await scopedUpload(user, workspaceSlug, sessionId, uploadId);
+    if (upload.status === "COMPLETED") return serialize(upload);
+    if (upload.status === "CANCELLED") throw conflictError("A cancelled upload cannot be completed.");
+    const asset = await verifyCloudinaryAsset(upload.resourceType, upload.publicId);
+    return finalizeVerifiedUpload(upload, asset);
 };
 
 export const cancelKnowledgeUpload = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, uploadId: string) => {

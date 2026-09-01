@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import CloudinaryError from "../core/shared/errors/CloudinaryError.js";
 import { isTransientUploadStatus, retryDelayMs } from "../core/knowledge/upload-policy.js";
 
@@ -56,7 +56,12 @@ export const signCloudinaryParameters = (parameters: Record<string, string | num
 export const createDirectUploadAuthorization = (publicId: string, resourceType: CloudinaryResourceType) => {
     const { cloudName, apiKey } = config();
     const timestamp = Math.floor(Date.now() / 1000);
-    const parameters = { overwrite: false, public_id: publicId, timestamp, unique_filename: false };
+    const notificationUrl = process.env.CLOUDINARY_NOTIFICATION_URL?.trim()
+        || `${(process.env.SERVER_URL || "").replace(/\/$/, "")}/api/webhooks/cloudinary`;
+    if (!notificationUrl.startsWith("https://")) {
+        throw new CloudinaryError({ code: "CLOUDINARY_NOT_CONFIGURED", message: "A secure Cloudinary notification URL is required.", status: 500, retryable: false });
+    }
+    const parameters = { notification_url: notificationUrl, overwrite: false, public_id: publicId, timestamp, unique_filename: false };
     return {
         uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
         apiKey,
@@ -64,6 +69,18 @@ export const createDirectUploadAuthorization = (publicId: string, resourceType: 
         signature: signCloudinaryParameters(parameters),
         parameters,
     };
+};
+
+export const verifyCloudinaryNotification = (rawBody: Buffer, signature?: string, timestamp?: string) => {
+    if (!signature || !timestamp || !/^\d+$/.test(timestamp)) return false;
+    const ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp));
+    if (ageSeconds > 2 * 60 * 60) return false;
+    const { apiSecret } = config();
+    const algorithm = signature.length === 64 ? "sha256" : "sha1";
+    const expected = createHash(algorithm).update(rawBody).update(timestamp).update(apiSecret).digest("hex");
+    const receivedBuffer = Buffer.from(signature, "hex");
+    const expectedBuffer = Buffer.from(expected, "hex");
+    return receivedBuffer.length === expectedBuffer.length && timingSafeEqual(receivedBuffer, expectedBuffer);
 };
 
 const authenticatedRequest = async (path: string, init: RequestInit = {}, retries = 3): Promise<Response> => {
@@ -102,9 +119,15 @@ const authenticatedRequest = async (path: string, init: RequestInit = {}, retrie
 };
 
 export const verifyCloudinaryAsset = async (resourceType: CloudinaryResourceType, publicId: string) => {
-    const response = await authenticatedRequest(`/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`);
-    if (response.status === 404) {
-        throw new CloudinaryError({ code: "CLOUDINARY_ASSET_NOT_READY", message: "Cloudinary has not completed this upload.", status: 422, retryable: false, upstreamStatus: 404 });
+    const path = `/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`;
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        response = await authenticatedRequest(path);
+        if (response.status !== 404) break;
+        if (attempt < 4) await sleep(retryDelayMs(attempt));
+    }
+    if (!response || response.status === 404) {
+        throw new CloudinaryError({ code: "CLOUDINARY_ASSET_NOT_READY", message: "Cloudinary is still finalizing this upload. Retry completion shortly.", status: 503, retryable: true, upstreamStatus: 404 });
     }
     if (!response.ok) {
         throw new CloudinaryError({ code: "CLOUDINARY_VERIFICATION_FAILED", message: `Cloudinary verification failed with status ${response.status}.`, status: 502, retryable: false, upstreamStatus: response.status });

@@ -9,6 +9,7 @@ import { CustomAIProvider } from "./core/ai-gateway/providers/custom.provider.js
 import { UnifiedAIProvider } from "./core/ai-gateway/providers/unified.provider.js";
 import { createGoogleModel, createOpenAIModel, createAnthropicModel } from "./core/ai-gateway/providers/factories.js";
 import aiRouter from "./core/ai-gateway/ai.route.js";
+import { handleCloudinaryWebhook } from "./controllers/cloudinaryWebhook.js";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use(corsMiddleware);
 
 
 app.use(morgan("dev"));
+app.post("/api/webhooks/cloudinary", express.raw({ type: "application/json", limit: "1mb" }), handleCloudinaryWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use((req, _res, next) => {

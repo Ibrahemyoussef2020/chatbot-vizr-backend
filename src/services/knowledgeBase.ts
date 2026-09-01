@@ -41,7 +41,7 @@ export const getKnowledgeSession = async (user: AuthenticatedUserContext, worksp
     ]);
     return {
         session: serializeSession(session),
-        sources: sources.map((source: any) => ({ id: String(source._id), name: source.name, kind: source.kind, mime_type: source.mimeType, size: source.size, status: source.status, error_message: source.errorMessage, metadata: source.metadata, created_at: source.createdAt })),
+        sources: sources.map((source: any) => ({ id: String(source._id), upload_id: source.uploadId || undefined, name: source.name, kind: source.kind, mime_type: source.mimeType, size: source.size, status: source.status, error_message: source.errorMessage, metadata: source.metadata, created_at: source.createdAt })),
         messages: messages.map((message: any) => ({ id: String(message._id), role: message.role, content: message.content, citations: message.citations, created_at: message.createdAt })),
     };
 };
