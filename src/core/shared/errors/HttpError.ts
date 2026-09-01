@@ -25,6 +25,7 @@ export const createHttpError = (status: number, message: string) => new HttpErro
 export const unauthorizedError = (message = "Unauthorized") => createHttpError(401, message);
 export const forbiddenError = (message = "Forbidden") => createHttpError(403, message);
 export const paymentRequiredError = (message = "Payment Required") => createHttpError(402, message);
+export const conflictError = (message = "Conflict") => createHttpError(409, message);
 export const notFoundError = (message = "Not Found") => createHttpError(404, message);
 export const unprocessableEntityError = (message = "Unprocessable Entity") => createHttpError(422, message);
 export const internalServerError = (message = "Internal Server Error") => createHttpError(500, message);

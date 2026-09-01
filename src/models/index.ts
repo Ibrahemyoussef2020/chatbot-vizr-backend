@@ -15,6 +15,7 @@ import TelegramBot from "./TelegramBot.js";
 import GmailConnection from "./GmailConnection.js";
 import KnowledgeSession from "./KnowledgeSession.js";
 import KnowledgeSource from "./KnowledgeSource.js";
+import KnowledgeUpload from "./KnowledgeUpload.js";
 import KnowledgeChatMessage from "./KnowledgeChatMessage.js";
 
 export {
@@ -35,5 +36,6 @@ export {
     GmailConnection,
     KnowledgeSession,
     KnowledgeSource,
+    KnowledgeUpload,
     KnowledgeChatMessage,
 };

@@ -12,7 +12,12 @@ const KnowledgeSourceSchema = new Schema({
     binary: { type: Buffer, select: false },
     errorMessage: { type: String, default: "" },
     metadata: { type: Schema.Types.Mixed, default: {} },
+    uploadId: { type: String, default: "", index: true },
+    cloudinaryAssetId: { type: String, default: "", index: true },
+    cloudinaryPublicId: { type: String, default: "" },
+    secureUrl: { type: String, default: "" },
 }, { timestamps: true });
 
 KnowledgeSourceSchema.index({ sessionId: 1, name: 1, size: 1 });
+KnowledgeSourceSchema.index({ workspaceId: 1, uploadId: 1 }, { unique: true, partialFilterExpression: { uploadId: { $type: "string", $gt: "" } } });
 export default model("KnowledgeSource", KnowledgeSourceSchema);

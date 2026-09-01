@@ -120,6 +120,11 @@ workspaceRouter.post(
     knowledgeBaseController.uploadSources,
 );
 workspaceRouter.post("/knowledge/sessions/:id/chat", knowledgeBaseController.chat);
+workspaceRouter.post("/knowledge/sessions/:id/uploads/initiate", knowledgeBaseController.initiateUpload);
+workspaceRouter.post("/knowledge/sessions/:id/uploads/:uploadId/refresh", knowledgeBaseController.refreshUpload);
+workspaceRouter.patch("/knowledge/sessions/:id/uploads/:uploadId/progress", knowledgeBaseController.uploadProgress);
+workspaceRouter.post("/knowledge/sessions/:id/uploads/:uploadId/complete", knowledgeBaseController.completeUpload);
+workspaceRouter.delete("/knowledge/sessions/:id/uploads/:uploadId", knowledgeBaseController.cancelUpload);
 
 // Security & Roles
 workspaceRouter.get("/security/roles", securityRoleController.getRoles);

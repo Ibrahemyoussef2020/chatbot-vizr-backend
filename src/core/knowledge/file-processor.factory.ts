@@ -60,14 +60,18 @@ const processors = {
 };
 
 export class KnowledgeFileProcessorFactory {
-    static kindFor(file: Express.Multer.File): KnowledgeSourceKind {
-        const extension = extname(file.originalname).toLowerCase();
-        if (file.mimetype === "application/pdf" || extension === ".pdf") return "pdf";
-        if (file.mimetype.startsWith("audio/")) return "audio";
-        if (file.mimetype.startsWith("video/")) return "video";
+    static kindForDescriptor(name: string, mimeType: string): KnowledgeSourceKind {
+        const extension = extname(name).toLowerCase();
+        if (mimeType === "application/pdf" || extension === ".pdf") return "pdf";
+        if (mimeType.startsWith("audio/")) return "audio";
+        if (mimeType.startsWith("video/")) return "video";
         if ([".xls", ".xlsx", ".csv"].includes(extension)) return "excel";
-        if (file.mimetype.startsWith("text/") || [".txt", ".md", ".json", ".xml"].includes(extension)) return "text";
-        throw unprocessableEntityError(`Unsupported knowledge file type: ${file.originalname}`);
+        if (mimeType.startsWith("text/") || [".txt", ".md", ".json", ".xml"].includes(extension)) return "text";
+        throw unprocessableEntityError(`Unsupported knowledge file type: ${name}`);
+    }
+
+    static kindFor(file: Express.Multer.File): KnowledgeSourceKind {
+        return this.kindForDescriptor(file.originalname, file.mimetype);
     }
 
     static create(file: Express.Multer.File): KnowledgeFileProcessor {
