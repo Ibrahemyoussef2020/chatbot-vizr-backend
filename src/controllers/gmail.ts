@@ -38,19 +38,24 @@ export const connect = async (req: Request, res: Response) => {
 };
 
 export const callback = async (req: Request, res: Response) => {
+    const frontend = (process.env.FRONTEND_URL || process.env.DOMAIN || "").replace(/\/$/, "");
     try {
         const code = String(req.query.code || "");
         const state = String(req.query.state || "");
         if (!code || !state) throw unprocessableEntityError(String(req.query.error || "Missing Google authorization response."));
         const result = await completeGmailOAuth(code, state);
-        const frontend = (process.env.FRONTEND_URL || process.env.DOMAIN || "").replace(/\/$/, "");
         if (frontend.startsWith("http")) {
             res.redirect(`${frontend}/dashboard/settings/channels/gmail?connected=1`);
             return;
         }
         res.status(200).json({ success: true, data: result });
     } catch (error: any) {
-        res.status(errorStatus(error, 400)).send(`Gmail connection failed: ${error.message || "Unknown OAuth error"}`);
+        const message = error.message || "Unknown OAuth error";
+        if (frontend.startsWith("http")) {
+            res.redirect(`${frontend}/dashboard/settings/channels/gmail?error=${encodeURIComponent(message)}`);
+            return;
+        }
+        res.status(errorStatus(error, 400)).send(`Gmail connection failed: ${message}`);
     }
 };
 
