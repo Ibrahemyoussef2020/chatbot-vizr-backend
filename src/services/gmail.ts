@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
-import { GmailConnection, Message, Conversation, Workspace } from "../models/index.js";
+import { randomUUID } from "node:crypto";
+import { GmailConnection, Message, Conversation, SystemLog, Workspace } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
 import { sendReply } from "./reply.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
@@ -265,10 +266,14 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
     });
 };
 
-export const handleGmailPubSub = async (body: any, verificationToken?: string) => {
+export const verifyGmailPubSubToken = (verificationToken?: string) => {
     if (!process.env.GOOGLE_PUBSUB_VERIFICATION_TOKEN || verificationToken !== process.env.GOOGLE_PUBSUB_VERIFICATION_TOKEN) {
         throw forbiddenError("Invalid Gmail Pub/Sub verification token.");
     }
+};
+
+export const handleGmailPubSub = async (body: any, verificationToken?: string) => {
+    verifyGmailPubSubToken(verificationToken);
     const encoded = body?.message?.data;
     if (!encoded) return;
     const notice = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
@@ -283,16 +288,45 @@ export const handleGmailPubSub = async (body: any, verificationToken?: string) =
         await connection.save();
         return;
     }
-    const history = await gmailRequest(connection, `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelId=INBOX`);
-    const ids = new Set<string>();
-    for (const record of history.history || []) {
-        for (const added of record.messagesAdded || []) if (added.message?.id) ids.add(added.message.id);
+    try {
+        const history = await gmailRequest(connection, `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelId=INBOX`);
+        const ids = new Set<string>();
+        for (const record of history.history || []) {
+            for (const added of record.messagesAdded || []) {
+                if (added.message?.id) ids.add(added.message.id);
+            }
+        }
+
+        const failures: string[] = [];
+        for (const id of ids) {
+            try {
+                await processGmailMessage(connection, workspace, id);
+            } catch (error: any) {
+                failures.push(error.message || "Unknown Gmail message processing error.");
+                await SystemLog.create({
+                    publicId: `gmail_${randomUUID()}`,
+                    systemSlug: workspace.slug,
+                    level: "error",
+                    category: "gmail-processing",
+                    message: "Gmail message could not be processed or answered.",
+                    metadata: {
+                        gmailMessageId: id,
+                        error: error.message || "Unknown error",
+                    },
+                });
+            }
+        }
+
+        connection.historyId = String(history.historyId || notice.historyId || connection.historyId);
+        connection.status = failures.length ? "error" : "active";
+        connection.errorMessage = failures[0] || "";
+        await connection.save();
+    } catch (error: any) {
+        connection.status = "error";
+        connection.errorMessage = error.message || "Unable to process Gmail notification.";
+        await connection.save();
+        throw error;
     }
-    for (const id of ids) await processGmailMessage(connection, workspace, id);
-    connection.historyId = String(history.historyId || notice.historyId || connection.historyId);
-    connection.status = "active";
-    connection.errorMessage = "";
-    await connection.save();
 };
 
 export const getGmailStatus = async (workspaceId: string) => {

@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { waitUntil } from "@vercel/functions";
 import { getWorkspace } from "../services/workspaces.js";
 import {
     completeGmailOAuth,
@@ -9,6 +10,7 @@ import {
     registerGmailWatch,
     renewExpiringGmailWatches,
     sendGmailTestMessage,
+    verifyGmailPubSubToken,
 } from "../services/gmail.js";
 import { GmailConnection } from "../models/index.js";
 import { unauthorizedError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
@@ -60,13 +62,22 @@ export const callback = async (req: Request, res: Response) => {
 };
 
 export const webhook = async (req: Request, res: Response) => {
+    const verificationToken = String(req.query.token || "");
+
     try {
-        await handleGmailPubSub(req.body, String(req.query.token || ""));
-        res.status(200).send("OK");
+        verifyGmailPubSubToken(verificationToken);
     } catch (error: any) {
         console.error("[Gmail Pub/Sub Error]", error.message);
-        res.status(errorStatus(error)).send("ERROR");
+        res.status(errorStatus(error, 403)).send("ERROR");
+        return;
     }
+
+    const processing = handleGmailPubSub(req.body, verificationToken)
+        .catch((error: any) => {
+            console.error("[Gmail Pub/Sub Processing Error]", error.message);
+        });
+    waitUntil(processing);
+    res.status(204).send();
 };
 
 export const status = async (req: Request, res: Response) => {
