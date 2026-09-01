@@ -22,13 +22,18 @@ export interface CloudinaryAsset {
 const config = (): CloudinaryConfig => {
     const cloudinaryUrl = process.env.CLOUDINARY_URL?.trim();
     const parsed = cloudinaryUrl ? new URL(cloudinaryUrl) : undefined;
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim() || parsed?.hostname;
+    const cloudName = process.env.CLOUDINARY_KEY_NAME?.trim() || parsed?.hostname;
     const apiKey = process.env.CLOUDINARY_API_KEY?.trim() || (parsed?.username ? decodeURIComponent(parsed.username) : undefined);
     const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim() || (parsed?.password ? decodeURIComponent(parsed.password) : undefined);
     if (!cloudName || !apiKey || !apiSecret) {
+        const missing = [
+            !cloudName && "CLOUDINARY_KEY_NAME",
+            !apiKey && "CLOUDINARY_API_KEY",
+            !apiSecret && "CLOUDINARY_API_SECRET",
+        ].filter(Boolean).join(", ");
         throw new CloudinaryError({
             code: "CLOUDINARY_NOT_CONFIGURED",
-            message: "Cloudinary is not configured.",
+            message: `Cloudinary is not configured. Missing: ${missing}.`,
             status: 500,
             retryable: false,
         });

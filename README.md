@@ -30,7 +30,7 @@ Override the local account passwords with `SEED_ADMIN_PASSWORD` and
 
 # Knowledge Base large uploads
 
-Large Knowledge Base files upload directly from the browser to Cloudinary in chunks. Configure either `CLOUDINARY_URL` or all of `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` on the backend only. Optional controls are `CLOUDINARY_MAX_UPLOAD_BYTES` (default 500 MB) and `CLOUDINARY_CHUNK_SIZE` (default 8 MB; never set below 6 MB).
+Large Knowledge Base files upload directly from the browser to Cloudinary in chunks. Configure either `CLOUDINARY_URL` or all of `CLOUDINARY_KEY_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` on the backend only. Optional controls are `CLOUDINARY_MAX_UPLOAD_BYTES` (default 500 MB) and `CLOUDINARY_CHUNK_SIZE` (default 8 MB; never set below 6 MB).
 
 The backend authenticates the user, checks workspace scope and file metadata, reserves a unique upload record, and returns short-lived signed parameters. The browser uses the returned upload ID as Cloudinary's `X-Unique-Upload-Id` for every chunk. A source is not recorded as uploaded until the backend independently reads the asset from Cloudinary and confirms its public ID and byte count.
 
