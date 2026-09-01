@@ -18,14 +18,9 @@ class TextProcessor implements KnowledgeFileProcessor {
 class PdfProcessor implements KnowledgeFileProcessor {
     readonly kind = "pdf" as const;
     async process(file: Express.Multer.File) {
-        const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: file.buffer });
-        try {
-            const result = await parser.getText();
-            return { text: result.text, metadata: { pages: result.total } };
-        } finally {
-            await parser.destroy();
-        }
+        const { default: parsePdf } = await import("pdf-parse");
+        const result = await parsePdf(file.buffer);
+        return { text: result.text, metadata: { pages: result.numpages } };
     }
 }
 
