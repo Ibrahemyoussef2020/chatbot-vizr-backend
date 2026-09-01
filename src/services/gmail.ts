@@ -18,7 +18,6 @@ const scopes = [
     "openid",
     "email",
     "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.send",
 ];
 
 const requireGoogleConfig = () => {
@@ -142,7 +141,14 @@ export const completeGmailOAuth = async (code: string, state: string) => {
     const tokens = await exchangeAuthorizationCode(code);
     const profileResponse = await fetch(`${GMAIL_API}/profile`, { headers: { Authorization: `Bearer ${tokens.access_token}` } });
     const profile: any = await profileResponse.json().catch(() => ({}));
-    if (!profileResponse.ok || !profile.emailAddress) throw internalServerError("Unable to read the connected Gmail profile.");
+    if (!profileResponse.ok || !profile.emailAddress) {
+        const googleMessage = profile?.error?.message || profile?.error_description;
+        throw internalServerError(
+            googleMessage
+                ? `Unable to read the connected Gmail profile: ${googleMessage}`
+                : "Unable to read the connected Gmail profile. Ensure the Gmail API is enabled for the Google Cloud project.",
+        );
+    }
     const existing = await GmailConnection.findOne({ workspaceId: workspace._id }).select("+refreshToken").exec();
     const connection = existing || new GmailConnection({ workspaceId: workspace._id });
     connection.email = String(profile.emailAddress).toLowerCase();
