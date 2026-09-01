@@ -158,7 +158,7 @@ export const completeGmailOAuth = async (code: string, state: string) => {
     connection.status = "pending";
     await connection.save();
     await registerGmailWatch(String(connection._id));
-    return { email: connection.email, status: connection.status };
+    return { email: connection.email, status: "active" as const };
 };
 
 const decodeBase64Url = (value?: string) => value
