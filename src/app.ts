@@ -54,7 +54,7 @@ AIFactory.registerProvider('anthropic', new UnifiedAIProvider('anthropic', creat
 AIFactory.registerProvider('vercel', new UnifiedAIProvider('openai', createOpenAIModel)); // fallback vercel to openai
 
 if (!process.env.DEFAULT_AI_PROVIDER) {
-    process.env.DEFAULT_AI_PROVIDER = 'google';
+    process.env.DEFAULT_AI_PROVIDER = 'openai';
 }
 
 

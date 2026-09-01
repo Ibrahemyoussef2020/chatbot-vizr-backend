@@ -1,5 +1,6 @@
 import { sendTelegramTestMessageService } from "../../services/telegramBot.js";
 import { sendWhatsAppTestMessageService } from "../../services/whatsappConfig.js";
+import { sendGmailReply } from "../../services/gmail.js";
 import { channelStrategyRegistry } from "./channel.registry.js";
 import type { ChannelStrategy } from "./channel.types.js";
 
@@ -25,6 +26,15 @@ const telegramStrategy: ChannelStrategy = {
     },
 };
 
+const gmailStrategy: ChannelStrategy = {
+    channel: "gmail",
+    async send(message) {
+        if (!message.conversationId) throw new Error("Gmail conversation ID is required.");
+        await sendGmailReply(message.conversationId, message.content);
+    },
+};
+
 channelStrategyRegistry.register(webStrategy);
 channelStrategyRegistry.register(whatsappStrategy);
 channelStrategyRegistry.register(telegramStrategy);
+channelStrategyRegistry.register(gmailStrategy);

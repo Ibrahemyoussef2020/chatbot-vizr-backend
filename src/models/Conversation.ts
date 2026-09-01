@@ -28,6 +28,7 @@ const ConversationSchema = new Schema(
         },
         externalContactId: { type: String, trim: true },
         channelAccountId: { type: String, trim: true },
+        channelMetadata: { type: Schema.Types.Mixed, default: {} },
         visitor: {
             name: {
                 type: String,

@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "api/index.ts"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/gmail/cron/renew",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

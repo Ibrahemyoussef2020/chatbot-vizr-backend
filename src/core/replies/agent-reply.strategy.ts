@@ -19,6 +19,7 @@ export class AgentReplyStrategy implements ReplyStrategy<AgentReplyInput> {
 
         try {
             await channelStrategyRegistry.send(input.channel, {
+                conversationId: input.conversationId,
                 recipientId: input.recipientId,
                 channelAccountId: input.channelAccountId,
                 systemSlug: input.systemSlug,

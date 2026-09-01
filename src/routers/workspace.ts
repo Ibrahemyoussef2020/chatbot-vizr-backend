@@ -13,6 +13,7 @@ import {
     dashboardOverviewController,
     dashboardAnalyticsController,
     threadManagementController,
+    gmailController,
 } from "../controllers/index.js";
 import { authenticate, validateRequest } from "../middlewares/index.js";
 import { createWorkspaceValidator, updateWorkspaceValidator } from "../validator/index.js";
@@ -92,6 +93,13 @@ workspaceRouter.post("/telegram/bots", telegramBotController.createTelegramBot);
 workspaceRouter.post("/telegram/bots/:id/webhook", telegramBotController.refreshTelegramWebhook);
 workspaceRouter.delete("/telegram/bots/:id", telegramBotController.deleteTelegramBot);
 workspaceRouter.post("/telegram/bots/:id/test-message", telegramBotController.sendTelegramTestMessage);
+
+// Gmail OAuth, mailbox watch, and connection state
+workspaceRouter.get("/gmail/connect", gmailController.connect);
+workspaceRouter.get("/gmail/status", gmailController.status);
+workspaceRouter.post("/gmail/watch", gmailController.renewWatch);
+workspaceRouter.delete("/gmail/disconnect", gmailController.disconnect);
+workspaceRouter.post("/gmail/test-message", gmailController.testMessage);
 
 // Security & Roles
 workspaceRouter.get("/security/roles", securityRoleController.getRoles);

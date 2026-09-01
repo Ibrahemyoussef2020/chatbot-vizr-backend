@@ -12,6 +12,7 @@ import AIConfig from "./AIConfig.js";
 import SecurityRole from "./SecurityRole.js";
 import WhatsAppConfig from "./WhatsAppConfig.js";
 import TelegramBot from "./TelegramBot.js";
+import GmailConnection from "./GmailConnection.js";
 
 export {
     User,
@@ -28,4 +29,5 @@ export {
     SecurityRole,
     WhatsAppConfig,
     TelegramBot,
+    GmailConnection,
 };
