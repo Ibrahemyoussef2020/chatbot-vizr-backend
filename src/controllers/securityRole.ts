@@ -9,7 +9,7 @@ const parseSlug = (req: Request): string | undefined => {
 export const getRoles = async (req: Request, res: Response): Promise<void> => {
     try {
         const slug = parseSlug(req);
-        const roles = await listRolesService(slug);
+        const roles = await listRolesService(res.locals.user, slug);
         res.json({ success: true, data: roles });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to fetch security roles." });
@@ -19,7 +19,7 @@ export const getRoles = async (req: Request, res: Response): Promise<void> => {
 export const saveRole = async (req: Request, res: Response): Promise<void> => {
     try {
         const roleId = typeof req.params.id === "string" ? req.params.id : undefined;
-        await saveRoleService(req.body, roleId);
+        await saveRoleService(res.locals.user, { ...req.body, system_slug: parseSlug(req) }, roleId);
         res.json({ success: true, message: "Role saved successfully." });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to save role." });
@@ -29,7 +29,7 @@ export const saveRole = async (req: Request, res: Response): Promise<void> => {
 export const deleteRole = async (req: Request, res: Response): Promise<void> => {
     try {
         const roleId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        await deleteRoleService(roleId);
+        await deleteRoleService(res.locals.user, roleId);
         res.json({ success: true, message: "Role deleted successfully." });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message || "Failed to delete role." });
