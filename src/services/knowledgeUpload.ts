@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { extname } from "node:path";
 import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
 import { duplicateDisposition, validateUploadDescriptor } from "../core/knowledge/upload-policy.js";
 import { conflictError, forbiddenError, internalServerError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
@@ -81,12 +82,14 @@ export const initiateKnowledgeUpload = async (
     if (existing) await UploadModel.deleteOne({ _id: existing._id });
 
     const uploadId = randomUUID();
-    const publicId = `vizr/${safeSegment(String(workspace.id))}/knowledge/${safeSegment(sessionId)}/${uploadId}`;
+    const resourceType = kind === "audio" || kind === "video" ? "video" : "raw";
+    const rawExtension = resourceType === "raw" ? extname(name).toLowerCase().replace(/[^.a-z0-9]/g, "") : "";
+    const publicId = `vizr/${safeSegment(String(workspace.id))}/knowledge/${safeSegment(sessionId)}/${uploadId}${rawExtension}`;
     try {
         const upload = await UploadModel.create({
             workspaceId: workspace.id, sessionId, createdBy: user.id, uploadId, fingerprint,
             fileName: name, mimeType, kind, size: input.size, publicId,
-            resourceType: kind === "audio" || kind === "video" ? "video" : "raw",
+            resourceType,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         });
         return { duplicate: false, resumed: false, ...authorization(upload) };
@@ -120,7 +123,9 @@ export const recordKnowledgeUploadProgress = async (user: AuthenticatedUserConte
 
 const finalizeVerifiedUpload = async (upload: any, asset: CloudinaryAsset) => {
     if (upload.status === "COMPLETED") return serialize(upload);
-    if (asset.public_id !== upload.publicId || asset.bytes !== upload.size) {
+    const authorizedExtension = upload.resourceType === "raw" ? extname(upload.fileName).toLowerCase() : "";
+    const authorizedPublicIds = [upload.publicId, authorizedExtension ? `${upload.publicId}${authorizedExtension}` : ""];
+    if (!authorizedPublicIds.includes(asset.public_id) || asset.bytes !== upload.size) {
         upload.status = "FAILED";
         upload.errorCode = "ASSET_MISMATCH";
         upload.errorMessage = "Cloudinary asset metadata did not match the authorized file.";
@@ -160,7 +165,8 @@ const finalizeVerifiedUpload = async (upload: any, asset: CloudinaryAsset) => {
 };
 
 export const completeKnowledgeUploadFromWebhook = async (asset: CloudinaryAsset) => {
-    const upload = await UploadModel.findOne({ publicId: asset.public_id }).exec();
+    const publicIdWithoutRawExtension = asset.resource_type === "raw" ? asset.public_id.replace(/\.[^.]+$/, "") : asset.public_id;
+    const upload = await UploadModel.findOne({ publicId: { $in: [asset.public_id, publicIdWithoutRawExtension] } }).exec();
     if (!upload) return { ignored: true };
     if (upload.status === "CANCELLED") {
         await destroyCloudinaryAsset(upload.resourceType, upload.publicId).catch(() => undefined);
@@ -174,7 +180,7 @@ export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, wo
     const { upload } = await scopedUpload(user, workspaceSlug, sessionId, uploadId);
     if (upload.status === "COMPLETED") return serialize(upload);
     if (upload.status === "CANCELLED") throw conflictError("A cancelled upload cannot be completed.");
-    const asset = await verifyCloudinaryAsset(upload.resourceType, upload.publicId);
+    const asset = await verifyCloudinaryAsset(upload.resourceType, upload.publicId, upload.fileName);
     return finalizeVerifiedUpload(upload, asset);
 };
 

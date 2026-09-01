@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { extname } from "node:path";
 import CloudinaryError from "../core/shared/errors/CloudinaryError.js";
 import { isTransientUploadStatus, retryDelayMs } from "../core/knowledge/upload-policy.js";
 
@@ -118,13 +119,17 @@ const authenticatedRequest = async (path: string, init: RequestInit = {}, retrie
     });
 };
 
-export const verifyCloudinaryAsset = async (resourceType: CloudinaryResourceType, publicId: string) => {
-    const path = `/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`;
+export const verifyCloudinaryAsset = async (resourceType: CloudinaryResourceType, publicId: string, fileName?: string) => {
+    const rawExtension = resourceType === "raw" ? extname(fileName || "").toLowerCase() : "";
+    const candidates = [publicId, rawExtension && !publicId.endsWith(rawExtension) ? `${publicId}${rawExtension}` : ""].filter(Boolean);
     let response: Response | undefined;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-        response = await authenticatedRequest(path);
-        if (response.status !== 404) break;
-        if (attempt < 4) await sleep(retryDelayMs(attempt));
+    for (const candidate of candidates) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            response = await authenticatedRequest(`/resources/${resourceType}/upload/${encodeURIComponent(candidate)}`);
+            if (response.status !== 404) break;
+            if (attempt < 4) await sleep(retryDelayMs(attempt));
+        }
+        if (response?.status !== 404) break;
     }
     if (!response || response.status === 404) {
         throw new CloudinaryError({ code: "CLOUDINARY_ASSET_NOT_READY", message: "Cloudinary is still finalizing this upload. Retry completion shortly.", status: 503, retryable: true, upstreamStatus: 404 });
