@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { internalServerError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
+import CloudinaryError from "../core/shared/errors/CloudinaryError.js";
 import { isTransientUploadStatus, retryDelayMs } from "../core/knowledge/upload-policy.js";
 
 export type CloudinaryResourceType = "raw" | "video";
@@ -25,7 +25,14 @@ const config = (): CloudinaryConfig => {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim() || parsed?.hostname;
     const apiKey = process.env.CLOUDINARY_API_KEY?.trim() || (parsed?.username ? decodeURIComponent(parsed.username) : undefined);
     const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim() || (parsed?.password ? decodeURIComponent(parsed.password) : undefined);
-    if (!cloudName || !apiKey || !apiSecret) throw internalServerError("Cloudinary is not configured.");
+    if (!cloudName || !apiKey || !apiSecret) {
+        throw new CloudinaryError({
+            code: "CLOUDINARY_NOT_CONFIGURED",
+            message: "Cloudinary is not configured.",
+            status: 500,
+            retryable: false,
+        });
+    }
     return { cloudName, apiKey, apiSecret };
 };
 
@@ -67,20 +74,36 @@ const authenticatedRequest = async (path: string, init: RequestInit = {}, retrie
                 signal: AbortSignal.timeout(15_000),
             });
             if (!isTransientUploadStatus(response.status) || attempt === retries) return response;
-            lastError = new Error(`Cloudinary temporarily returned ${response.status}`);
+            lastError = new CloudinaryError({
+                code: "CLOUDINARY_NETWORK_ERROR",
+                message: `Cloudinary temporarily returned ${response.status}.`,
+                status: 503,
+                retryable: true,
+                upstreamStatus: response.status,
+            });
         } catch (error) {
             lastError = error;
             if (attempt === retries) break;
         }
         await sleep(retryDelayMs(attempt));
     }
-    throw internalServerError(`Cloudinary is temporarily unavailable: ${lastError instanceof Error ? lastError.message : "network error"}`);
+    throw new CloudinaryError({
+        code: "CLOUDINARY_NETWORK_ERROR",
+        message: `Cloudinary is temporarily unavailable: ${lastError instanceof Error ? lastError.message : "network error"}`,
+        status: 503,
+        retryable: true,
+        cause: lastError,
+    });
 };
 
 export const verifyCloudinaryAsset = async (resourceType: CloudinaryResourceType, publicId: string) => {
     const response = await authenticatedRequest(`/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`);
-    if (response.status === 404) throw unprocessableEntityError("Cloudinary has not completed this upload.");
-    if (!response.ok) throw internalServerError(`Cloudinary verification failed with status ${response.status}.`);
+    if (response.status === 404) {
+        throw new CloudinaryError({ code: "CLOUDINARY_ASSET_NOT_READY", message: "Cloudinary has not completed this upload.", status: 422, retryable: false, upstreamStatus: 404 });
+    }
+    if (!response.ok) {
+        throw new CloudinaryError({ code: "CLOUDINARY_VERIFICATION_FAILED", message: `Cloudinary verification failed with status ${response.status}.`, status: 502, retryable: false, upstreamStatus: response.status });
+    }
     return await response.json() as CloudinaryAsset;
 };
 
@@ -94,5 +117,7 @@ export const destroyCloudinaryAsset = async (resourceType: CloudinaryResourceTyp
         body,
         signal: AbortSignal.timeout(15_000),
     });
-    if (!response.ok && response.status !== 404) throw internalServerError(`Cloudinary cleanup failed with status ${response.status}.`);
+    if (!response.ok && response.status !== 404) {
+        throw new CloudinaryError({ code: "CLOUDINARY_CLEANUP_FAILED", message: `Cloudinary cleanup failed with status ${response.status}.`, status: 502, retryable: isTransientUploadStatus(response.status), upstreamStatus: response.status });
+    }
 };

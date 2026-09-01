@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
 import { duplicateDisposition, validateUploadDescriptor } from "../core/knowledge/upload-policy.js";
-import { conflictError, forbiddenError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
+import { conflictError, forbiddenError, internalServerError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import { createDirectUploadAuthorization, destroyCloudinaryAsset, verifyCloudinaryAsset } from "../lib/cloudinary.js";
 import { KnowledgeSession, KnowledgeSource, KnowledgeUpload } from "../models/index.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
@@ -139,7 +139,7 @@ export const completeKnowledgeUpload = async (user: AuthenticatedUserContext, wo
             { $setOnInsert: { workspaceId: workspace.id, sessionId, name: upload.fileName, mimeType: upload.mimeType, kind: upload.kind, size: upload.size, status: "processing", uploadId, cloudinaryAssetId: asset.asset_id, cloudinaryPublicId: asset.public_id, secureUrl: asset.secure_url } },
             { upsert: true, new: true },
         ).exec();
-        if (!source) throw new Error("Knowledge source metadata could not be created.");
+        if (!source) throw internalServerError("Knowledge source metadata could not be created.");
     } catch (error) {
         await destroyCloudinaryAsset(upload.resourceType, upload.publicId).catch(() => undefined);
         upload.status = "FAILED";

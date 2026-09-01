@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { HttpError, ValidationError } from "../core/shared/errors/index.js";
+import { CloudinaryError, HttpError, ValidationError } from "../core/shared/errors/index.js";
 
 const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     console.error("[ERROR HANDLER CAUGHT]:", err);
@@ -9,6 +9,15 @@ const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFun
             message: err.message,
             status: err.status,
             errors: err.errors,
+        });
+    }
+
+    if (err instanceof CloudinaryError) {
+        return res.status(err.status).json({
+            message: err.message,
+            status: err.status,
+            code: err.code,
+            retryable: err.retryable,
         });
     }
 
