@@ -1,4 +1,4 @@
-export const channelNames = ["web", "whatsapp", "telegram", "gmail"] as const;
+export const channelNames = ["web", "whatsapp", "telegram", "instagram", "gmail"] as const;
 
 export type ChannelName = (typeof channelNames)[number];
 

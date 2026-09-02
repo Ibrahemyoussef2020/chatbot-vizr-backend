@@ -1,7 +1,19 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { Conversation, Message, Workspace, TelegramBot } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
-import { sendReply } from "./reply.js";
+import { enqueueChannelReply } from "./channelReplyJobs.js";
+import { z } from "zod";
+
+const telegramUpdateSchema = z.object({
+    update_id: z.number().int(),
+    message: z.object({
+        message_id: z.number().int(),
+        chat: z.object({ id: z.union([z.string(), z.number()]) }).passthrough(),
+        from: z.record(z.string(), z.any()).optional(),
+        text: z.string().optional(),
+        caption: z.string().optional(),
+    }).passthrough().optional(),
+}).passthrough();
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -140,7 +152,8 @@ export const handleTelegramWebhookService = async (botId: string, update: any, p
         throw new Error("Invalid Telegram webhook secret.");
     }
 
-    const incoming = update?.message;
+    update = telegramUpdateSchema.parse(update);
+    const incoming = update.message;
     const text = incoming?.text || incoming?.caption;
     if (!incoming?.message_id || !incoming?.chat?.id || !text) return;
 
@@ -162,22 +175,16 @@ export const handleTelegramWebhookService = async (botId: string, update: any, p
         visitor: { name },
     });
 
-    if (!saved.duplicate && saved.conversation) {
-        await sendReply({
-            type: "ai",
-            conversationId: String(saved.conversation._id),
-            inboundMessageId: String(saved.message._id),
-            systemSlug: workspace.slug,
-            channel: "telegram",
-            deliver: async (replyText) => {
-                await sendTelegramTestMessageService(
-                    String(bot._id),
-                    String(incoming.chat.id),
-                    replyText,
-                );
-            },
-        });
-    }
+    if (!saved.conversation) throw new Error("Telegram conversation could not be resolved.");
+    await enqueueChannelReply({
+        eventId: `${bot._id}:${incoming.message_id}`,
+        channel: "telegram",
+        conversationId: String(saved.conversation._id),
+        inboundMessageId: String(saved.message._id),
+        systemSlug: workspace.slug,
+        recipientId: String(incoming.chat.id),
+        channelAccountId: String(bot._id),
+    });
 
     bot.status = "active";
     bot.error_message = "";

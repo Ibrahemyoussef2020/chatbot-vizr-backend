@@ -17,7 +17,10 @@ export const saveInboundChannelMessage = async (input: SaveInboundChannelMessage
         receivedFrom: input.receivedFrom,
         externalMessageId: input.externalMessageId,
     }).exec();
-    if (duplicate) return { conversation: null, message: duplicate, duplicate: true };
+    if (duplicate) {
+        const conversation = await Conversation.findById(duplicate.conversationId).exec();
+        return { conversation, message: duplicate, duplicate: true };
+    }
 
     const identity = {
         systemSlug: input.systemSlug,
@@ -41,13 +44,21 @@ export const saveInboundChannelMessage = async (input: SaveInboundChannelMessage
         conversation.endedAt = undefined;
     }
 
-    const message = await Message.create({
-        conversationId: conversation._id,
-        senderType: "visitor",
-        receivedFrom: input.receivedFrom,
-        externalMessageId: input.externalMessageId,
-        content: input.content,
-    });
+    let message;
+    try {
+        message = await Message.create({
+            conversationId: conversation._id,
+            senderType: "visitor",
+            receivedFrom: input.receivedFrom,
+            externalMessageId: input.externalMessageId,
+            content: input.content,
+        });
+    } catch (error: any) {
+        if (error?.code !== 11000) throw error;
+        const existing = await Message.findOne({ receivedFrom: input.receivedFrom, externalMessageId: input.externalMessageId }).exec();
+        if (!existing) throw error;
+        return { conversation: await Conversation.findById(existing.conversationId).exec(), message: existing, duplicate: true };
+    }
 
     conversation.set("updatedAt", new Date());
     await conversation.save();

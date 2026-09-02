@@ -16,6 +16,7 @@ import {
     threadManagementController,
     gmailController,
     knowledgeBaseController,
+    channelJobsController,
 } from "../controllers/index.js";
 import { authenticate, validateRequest } from "../middlewares/index.js";
 import { createWorkspaceValidator, updateWorkspaceValidator } from "../validator/index.js";
@@ -30,6 +31,8 @@ const knowledgeUpload = multer({
 });
 
 workspaceRouter.use(authenticate);
+workspaceRouter.get("/channel-jobs/failed", channelJobsController.failed);
+workspaceRouter.post("/channel-jobs/:id/retry", channelJobsController.retry);
 
 // Workspace Systems
 workspaceRouter.get("/systems-list", workspaceController.list);
@@ -128,6 +131,7 @@ workspaceRouter.post("/knowledge/sessions/:id/uploads/:uploadId/complete", knowl
 workspaceRouter.delete("/knowledge/sessions/:id/uploads/:uploadId", knowledgeBaseController.cancelUpload);
 workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind", knowledgeBaseController.listOutputs);
 workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind", knowledgeBaseController.saveOutput);
+workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/generate", knowledgeBaseController.generateOutput);
 workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind/:outputId", knowledgeBaseController.showOutput);
 workspaceRouter.patch("/knowledge/sessions/:id/outputs/:kind/:outputId/saved", knowledgeBaseController.saveOutputFavorite);
 workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/regenerate", knowledgeBaseController.regenerateOutput);

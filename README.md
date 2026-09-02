@@ -26,6 +26,35 @@ The runner executes seeders from `src/seeders` in dependency order:
 5. Dashboard conversations and messages, analytics telemetry, tags, and logs.
 
 Seeders use deterministic records and upserts. They do not wipe the database.
+
+## Knowledge AI generation
+
+Plans and reports use the Vercel AI SDK through Vercel AI Gateway. The backend validates every provider result against the shared Zod output schema before writing it to MongoDB, and the frontend receives the same serialized output shape for every provider.
+
+Copy the knowledge settings from `.env.example` into the backend environment. `AI_GATEWAY_API_KEY` is required locally. On Vercel, add the same variables in Project Settings and select stable model IDs available in the project's AI Gateway account. `KNOWLEDGE_AI_MODEL` is the primary model; `KNOWLEDGE_AI_FALLBACK_MODELS` is a comma-separated fallback chain.
+
+Generation retries transient model calls twice, applies a total request timeout, bounds source context, prevents duplicate generation for the same session and output kind, and limits concurrent work per running backend instance. Production deployments with sustained generation traffic should replace the in-process concurrency gate with a durable Redis-backed queue.
+
+## Customer-service AI
+
+The main web, WhatsApp, Telegram, and Gmail AI reply strategy also uses Vercel AI Gateway when `DEFAULT_AI_PROVIDER=vercel`. It loads the workspace's saved AI configuration, applies company identity, tone, pricing, language, contact, and action rules, and adds bounded excerpts from ready Knowledge Base sources. Source content is treated as untrusted data rather than instructions.
+
+Configure `CHAT_AI_MODEL` and `CHAT_AI_FALLBACK_MODELS` independently from plan/report generation. Chat requests use two SDK retries, a bounded timeout, output-token and history limits, per-instance concurrency protection, Gateway usage attribution by workspace, and safe errors when the provider chain is unavailable.
+
+## Redis/BullMQ channel workers
+
+WhatsApp, Telegram, and Instagram webhook requests validate the platform event, persist inbound messages idempotently in MongoDB, enqueue a deterministic BullMQ job, and acknowledge only after Redis accepts the job. AI generation and platform delivery never run inside those webhook request lifecycles. Queue outages return a retryable response instead of silently losing an inbound event.
+
+Set `REDIS_URL` for both the API process and worker process, then run them independently:
+
+```bash
+npm run dev
+npm run worker:dev
+```
+
+Production uses `npm start` for the API and `npm run worker` for a continuously running worker service. Do not deploy the worker as a request-based serverless function. BullMQ retries failed jobs with exponential backoff. MongoDB `WebhookEvent` records provide durable processing status, attempt counts, failure details, and webhook idempotency. Failed jobs remain in Redis and can be inspected with `GET /api/admin/channel-jobs/failed?system_slug=<slug>` and retried using `POST /api/admin/channel-jobs/<event-id>/retry` with `system_slug` in the body.
+
+Meta POST webhooks require `X-Hub-Signature-256`. WhatsApp uses its stored app secret with `WHATSAPP_APP_SECRET`/`META_APP_SECRET` fallback. Instagram requires a `MetaChannelConfig` record containing the workspace, Instagram account ID, Facebook Page ID, Page access token, app secret, and verify token; secrets are excluded from normal queries. The Instagram callback is `/api/instagram/webhook`. Telegram continues to require its per-bot `X-Telegram-Bot-Api-Secret-Token`.
 Override the local account passwords with `SEED_ADMIN_PASSWORD` and
 `SEED_AGENT_PASSWORD` when needed.
 

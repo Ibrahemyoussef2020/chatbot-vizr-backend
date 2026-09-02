@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { ZodError } from "zod";
 import {
     listTelegramBotsService,
     createTelegramBotService,
@@ -16,7 +17,9 @@ export const handleTelegramWebhook = async (req: Request, res: Response): Promis
         res.status(200).send("OK");
     } catch (error: any) {
         console.error("[Telegram Webhook Error]", error.message);
-        res.status(200).send("OK");
+        const invalidSecret = error.message === "Invalid Telegram webhook secret.";
+        const invalidEvent = error instanceof ZodError;
+        res.status(invalidSecret ? 403 : invalidEvent ? 400 : 503).send(invalidSecret ? "FORBIDDEN" : invalidEvent ? "INVALID_EVENT" : "RETRY");
     }
 };
 

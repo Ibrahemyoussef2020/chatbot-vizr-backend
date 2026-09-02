@@ -21,7 +21,7 @@ const ConversationSchema = new Schema(
         },
         receivedFrom: {
             type: String,
-            enum: ["web", "whatsapp", "telegram", "gmail"],
+            enum: ["web", "whatsapp", "telegram", "instagram", "gmail"],
             default: "web",
             required: true,
             index: true,

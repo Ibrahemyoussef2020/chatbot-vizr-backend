@@ -22,6 +22,7 @@ export interface AiReplyInput extends BaseReplyInput {
     providerName?: string;
     systemPrompt?: string;
     deliver?: (content: string) => Promise<unknown>;
+    idempotencyKey?: string;
 }
 
 export type ReplyInput = AgentReplyInput | AiReplyInput;

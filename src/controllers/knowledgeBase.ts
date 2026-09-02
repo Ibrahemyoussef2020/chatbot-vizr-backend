@@ -22,6 +22,7 @@ import {
     listSavedKnowledgeOutputs,
     getKnowledgeOutputSchema,
     getSharedKnowledgeOutput,
+    generateKnowledgeOutput,
     regenerateKnowledgeOutput,
     retryKnowledgeOutputSchema,
     saveKnowledgeOutput,
@@ -191,6 +192,11 @@ export const showOutput = async (req: Request, res: Response, next: NextFunction
 
 export const saveOutput = async (req: Request, res: Response, next: NextFunction) => {
     try { const { sessionId, kind } = outputArgs(req); res.status(201).json({ success: true, data: await saveKnowledgeOutput(res.locals.user, parseSlug(req), sessionId, kind, req.body) }); }
+    catch (error) { next(error); }
+};
+
+export const generateOutput = async (req: Request, res: Response, next: NextFunction) => {
+    try { const { sessionId, kind } = outputArgs(req); res.status(201).json({ success: true, data: await generateKnowledgeOutput(res.locals.user, parseSlug(req), sessionId, kind, req.body) }); }
     catch (error) { next(error); }
 };
 

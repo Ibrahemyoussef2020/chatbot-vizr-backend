@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { SystemLog, WhatsAppConfig, Workspace } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
-import { sendReply } from "./reply.js";
-import { sendWhatsAppTestMessageService } from "./whatsappConfig.js";
+import { enqueueChannelReply } from "./channelReplyJobs.js";
+import { z } from "zod";
+
+const whatsappEnvelopeSchema = z.object({
+    object: z.literal("whatsapp_business_account"),
+    entry: z.array(z.object({ changes: z.array(z.object({ value: z.record(z.string(), z.any()) }).passthrough()) }).passthrough()),
+}).passthrough();
 
 /**
  * Verifies Meta Webhook challenge token against stored workspace config.
@@ -30,6 +35,7 @@ export const verifyWhatsAppWebhookService = async (
  */
 export const handleWhatsAppWebhookEventService = async (body: any): Promise<void> => {
     if (body?.object !== "whatsapp_business_account") return;
+    body = whatsappEnvelopeSchema.parse(body);
 
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
@@ -103,23 +109,17 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
         visitor: { name: profileName, phone: fromPhone },
     });
 
-    if (!saved.duplicate && saved.conversation) {
-        await sendReply({
-            type: "ai",
-            conversationId: String(saved.conversation._id),
-            inboundMessageId: String(saved.message._id),
-            systemSlug: workspace.slug,
-            channel: "whatsapp",
-            deliver: async (replyText) => {
-                await sendWhatsAppTestMessageService(
-                    fromPhone,
-                    replyText,
-                    workspace.slug,
-                );
-            },
-        });
-    }
-    await SystemLog.create({
+    if (!saved.conversation) throw new Error("WhatsApp conversation could not be resolved.");
+    await enqueueChannelReply({
+        eventId: String(message.id),
+        channel: "whatsapp",
+        conversationId: String(saved.conversation._id),
+        inboundMessageId: String(saved.message._id),
+        systemSlug: workspace.slug,
+        recipientId: String(fromPhone),
+        channelAccountId: String(phoneNumberId),
+    });
+    if (!alreadyRecorded) await SystemLog.create({
         publicId: `wa_${randomUUID()}`,
         systemSlug: workspace?.slug || "unknown",
         level: "info",

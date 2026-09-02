@@ -2,16 +2,22 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import express from "express";
 import morgan from "morgan";
+import { fileURLToPath } from "node:url";
 import { errorHandler, corsMiddleware } from "./middlewares/index.js";
 import appRouter from "./routers/index.js";
 import { AIFactory } from "./core/ai-gateway/ai-gateway.factory.js";
 import { CustomAIProvider } from "./core/ai-gateway/providers/custom.provider.js";
 import { UnifiedAIProvider } from "./core/ai-gateway/providers/unified.provider.js";
+import { VercelGatewayAIProvider } from "./core/ai-gateway/providers/vercel-gateway.provider.js";
 import { createGoogleModel, createOpenAIModel, createAnthropicModel } from "./core/ai-gateway/providers/factories.js";
 import aiRouter from "./core/ai-gateway/ai.route.js";
 import { handleCloudinaryWebhook } from "./controllers/cloudinaryWebhook.js";
+import { KnowledgeOutputAIFactory } from "./core/knowledge/knowledge-output-ai.factory.js";
+import { VercelKnowledgeOutputProvider } from "./core/knowledge/vercel-knowledge-output.provider.js";
+import { channelReplyQueueRegistry } from "./core/jobs/channel-reply.job.js";
+import { BullMQChannelReplyQueue } from "./infrastructure/queue/bullmq-channel-reply.queue.js";
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
 
 const app = express();
 
@@ -29,7 +35,7 @@ app.use(corsMiddleware);
 
 app.use(morgan("dev"));
 app.post("/api/webhooks/cloudinary", express.raw({ type: "application/json", limit: "1mb" }), handleCloudinaryWebhook);
-app.use(express.json());
+app.use(express.json({ verify: (req, _res, buffer) => { (req as any).rawBody = Buffer.from(buffer); } }));
 app.use(express.urlencoded({ extended: true }));
 app.use((req, _res, next) => {
     delete (req as any).cookies;
@@ -53,10 +59,12 @@ AIFactory.registerProvider('custom', new CustomAIProvider());
 AIFactory.registerProvider('google', new UnifiedAIProvider('google', createGoogleModel));
 AIFactory.registerProvider('openai', new UnifiedAIProvider('openai', createOpenAIModel));
 AIFactory.registerProvider('anthropic', new UnifiedAIProvider('anthropic', createAnthropicModel));
-AIFactory.registerProvider('vercel', new UnifiedAIProvider('openai', createOpenAIModel)); // fallback vercel to openai
+AIFactory.registerProvider('vercel', new VercelGatewayAIProvider());
+KnowledgeOutputAIFactory.registerProvider('vercel', new VercelKnowledgeOutputProvider());
+channelReplyQueueRegistry.register(new BullMQChannelReplyQueue());
 
 if (!process.env.DEFAULT_AI_PROVIDER) {
-    process.env.DEFAULT_AI_PROVIDER = 'openai';
+    process.env.DEFAULT_AI_PROVIDER = 'vercel';
 }
 
 

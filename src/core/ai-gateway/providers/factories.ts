@@ -8,7 +8,8 @@ const isUsableSecret = (value?: string): value is string => {
     const normalized = value?.trim();
     return Boolean(
         normalized
-        && !/placeholder|your[_-]?|demo|changeme/i.test(normalized),
+        && normalized.startsWith("sk-")
+        && !/placeholder|your[_-]?|demo|changeme|ai[_-]?chatbot/i.test(normalized),
     );
 };
 

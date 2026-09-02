@@ -1,6 +1,7 @@
 import { sendTelegramTestMessageService } from "../../services/telegramBot.js";
 import { sendWhatsAppTestMessageService } from "../../services/whatsappConfig.js";
 import { sendGmailReply } from "../../services/gmail.js";
+import { sendInstagramReply } from "../../services/instagram.js";
 import { channelStrategyRegistry } from "./channel.registry.js";
 import type { ChannelStrategy } from "./channel.types.js";
 
@@ -34,7 +35,16 @@ const gmailStrategy: ChannelStrategy = {
     },
 };
 
+const instagramStrategy: ChannelStrategy = {
+    channel: "instagram",
+    async send(message) {
+        if (!message.channelAccountId) throw new Error("Instagram configuration ID is missing from the conversation.");
+        await sendInstagramReply(message.channelAccountId, message.recipientId, message.content);
+    },
+};
+
 channelStrategyRegistry.register(webStrategy);
 channelStrategyRegistry.register(whatsappStrategy);
 channelStrategyRegistry.register(telegramStrategy);
+channelStrategyRegistry.register(instagramStrategy);
 channelStrategyRegistry.register(gmailStrategy);

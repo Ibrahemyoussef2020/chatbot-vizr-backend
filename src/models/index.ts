@@ -19,6 +19,8 @@ import KnowledgeUpload from "./KnowledgeUpload.js";
 import KnowledgeChatMessage from "./KnowledgeChatMessage.js";
 import KnowledgeOutput from "./KnowledgeOutput.js";
 import KnowledgeOutputSection from "./KnowledgeOutputSection.js";
+import WebhookEvent from "./WebhookEvent.js";
+import MetaChannelConfig from "./MetaChannelConfig.js";
 
 export {
     User,
@@ -42,4 +44,6 @@ export {
     KnowledgeChatMessage,
     KnowledgeOutput,
     KnowledgeOutputSection,
+    WebhookEvent,
+    MetaChannelConfig,
 };

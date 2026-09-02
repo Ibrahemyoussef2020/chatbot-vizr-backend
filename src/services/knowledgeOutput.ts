@@ -1,14 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { OutputEditStrategyFactory, outputSectionPayloadSchema } from "../core/knowledge/output-edit-strategy.factory.js";
-import { conflictError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
-import { KnowledgeOutput, KnowledgeOutputSection, KnowledgeSession } from "../models/index.js";
+import { KnowledgeOutputAIFactory } from "../core/knowledge/knowledge-output-ai.factory.js";
+import { boundKnowledgeSources, withKnowledgeGenerationSlot } from "../core/knowledge/knowledge-generation.policy.js";
+import { conflictError, createHttpError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
+import { KnowledgeOutput, KnowledgeOutputSection, KnowledgeSession, KnowledgeSource } from "../models/index.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import { getWorkspace } from "./workspaces.js";
 
 const OutputModel: any = KnowledgeOutput;
 const SectionModel: any = KnowledgeOutputSection;
 const SessionModel: any = KnowledgeSession;
+const SourceModel: any = KnowledgeSource;
 const kindSchema = z.enum(["plan", "report"]);
 const parseInput = <T>(schema: z.ZodType<T>, input: unknown): T => {
     const result = schema.safeParse(input);
@@ -99,6 +102,61 @@ export const saveKnowledgeOutput = async (user: AuthenticatedUserContext, worksp
         ).exec()));
         await refreshOutputStatus(String(output._id));
     }
+    return getKnowledgeOutput(user, workspaceSlug, sessionId, parsedKind, String(output._id));
+};
+
+const generationInputSchema = z.object({
+    instruction: z.string().trim().max(5000).optional(),
+    provider: z.string().trim().min(1).max(80).optional(),
+});
+
+export const generateKnowledgeOutput = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, kind: string, input: unknown) => {
+    const { workspace, session } = await scope(user, workspaceSlug, sessionId);
+    const parsedKind = parseInput(kindSchema, kind);
+    const request = parseInput(generationInputSchema, input);
+    const activeOutput = await OutputModel.exists({ workspaceId: workspace.id, sessionId, kind: parsedKind, status: "generating" });
+    if (activeOutput) throw conflictError(`A ${parsedKind} is already generating for this session.`);
+    const sources: any[] = await SourceModel.find({ sessionId, status: "ready" }).select("name +extractedText").sort({ createdAt: -1 }).limit(20).lean().exec();
+    if (!sources.length) throw unprocessableEntityError("Upload and process at least one source before generating an output.");
+
+    const providerName = request.provider || process.env.KNOWLEDGE_AI_PROVIDER?.trim() || "vercel";
+    const output = await OutputModel.create({
+        workspaceId: workspace.id,
+        sessionId,
+        kind: parsedKind,
+        createdBy: user.id,
+        title: `${session.title} ${parsedKind === "plan" ? "Plan" : "Report"}`,
+        description: "Generation in progress.",
+        category: "AI generated",
+        status: "generating",
+    });
+
+    try {
+        const generated = await withKnowledgeGenerationSlot(() => KnowledgeOutputAIFactory.getProvider(providerName).generate({
+            kind: parsedKind,
+            sessionTitle: session.title,
+            instruction: request.instruction,
+            sources: boundKnowledgeSources(sources),
+        }));
+        const duplicateKeys = generated.schemas.filter((section, index, all) => all.findIndex((candidate) => candidate.key === section.key) !== index);
+        if (duplicateKeys.length) throw conflictError("AI generated duplicate schema keys.");
+        output.set({ title: generated.title, description: generated.description, category: generated.category });
+        await output.save();
+        await SectionModel.insertMany(generated.schemas.map((section) => ({
+            ...section,
+            workspaceId: workspace.id,
+            sessionId,
+            outputId: output._id,
+            status: "ready",
+            error: "",
+        })));
+        await refreshOutputStatus(String(output._id));
+    } catch (error) {
+        await OutputModel.updateOne({ _id: output._id }, { $set: { status: "failed" } }).exec();
+        console.error(`[KnowledgeOutput] ${providerName} generation failed:`, error);
+        throw createHttpError(502, "Knowledge generation failed after trying the configured AI providers. Retry shortly.");
+    }
+
     return getKnowledgeOutput(user, workspaceSlug, sessionId, parsedKind, String(output._id));
 };
 
