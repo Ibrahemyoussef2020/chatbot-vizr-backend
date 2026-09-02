@@ -8,6 +8,7 @@ import { seedConfig } from "./config.js";
 import { seedTokenLogs } from "./tokenLog.seeder.js";
 import { seedTags } from "./tag.seeder.js";
 import { seedSystemLogs } from "./systemLog.seeder.js";
+import { seedKnowledgeOutputs } from "./knowledgeOutput.seeder.js";
 
 const runSeeders = async () => {
     await connectDB();
@@ -30,6 +31,9 @@ const runSeeders = async () => {
     }
     await seedAgentUser(firstBusinessWorkspace._id);
 
+    console.log("Seeding Brand and Vizr knowledge sessions, plans, and reports...");
+    const knowledgeResult = await seedKnowledgeOutputs(workspaces);
+
     console.log("Seeding dashboard conversations and messages...");
     const convResult = await seedConversations();
 
@@ -43,7 +47,7 @@ const runSeeders = async () => {
     const logResult = await seedSystemLogs();
 
     console.log(
-        `Seed complete: ${workspaces.length} workspaces (${convResult.conversations} conversations, ${tokenResult.tokenLogs} token logs, ${tagResult.tags} tags, ${logResult.logs} logs).`,
+        `Seed complete: ${workspaces.length} workspaces (${convResult.conversations} conversations, ${tokenResult.tokenLogs} token logs, ${tagResult.tags} tags, ${logResult.logs} logs, ${knowledgeResult.sessions} knowledge sessions, ${knowledgeResult.outputs} generated outputs, ${knowledgeResult.schemas} output schemas).`,
     );
 };
 

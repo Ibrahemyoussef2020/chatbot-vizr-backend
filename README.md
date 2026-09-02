@@ -22,11 +22,20 @@ The runner executes seeders from `src/seeders` in dependency order:
 1. Admin user required to own the demo workspace.
 2. Demo workspace.
 3. Workspace assignment and agent user.
-4. Dashboard conversations and messages.
+4. Brand Ecommerce and Vizr knowledge sessions with persisted plans, reports, and independently addressable output schemas.
+5. Dashboard conversations and messages, analytics telemetry, tags, and logs.
 
 Seeders use deterministic records and upserts. They do not wipe the database.
 Override the local account passwords with `SEED_ADMIN_PASSWORD` and
 `SEED_AGENT_PASSWORD` when needed.
+
+The knowledge-output seeder creates two sessions in `brand-ecommerce` and two in
+`vizr`. Each session receives a six-schema Plan and a nine-schema Report. Running
+the seed command again updates those deterministic records without duplicating
+them and does not delete user-created sessions or outputs. To seed a production
+deployment, run `npm run seed` with that deployment's database environment
+configured and reviewed; the repository does not automatically mutate the
+production database during build or deployment.
 
 # Knowledge Base large uploads
 

@@ -17,6 +17,8 @@ import KnowledgeSession from "./KnowledgeSession.js";
 import KnowledgeSource from "./KnowledgeSource.js";
 import KnowledgeUpload from "./KnowledgeUpload.js";
 import KnowledgeChatMessage from "./KnowledgeChatMessage.js";
+import KnowledgeOutput from "./KnowledgeOutput.js";
+import KnowledgeOutputSection from "./KnowledgeOutputSection.js";
 
 export {
     User,
@@ -38,4 +40,6 @@ export {
     KnowledgeSource,
     KnowledgeUpload,
     KnowledgeChatMessage,
+    KnowledgeOutput,
+    KnowledgeOutputSection,
 };

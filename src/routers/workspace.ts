@@ -111,6 +111,7 @@ workspaceRouter.delete("/gmail/disconnect", gmailController.disconnect);
 workspaceRouter.post("/gmail/test-message", gmailController.testMessage);
 
 // Knowledge Base sessions, sources, and grounded chat
+workspaceRouter.get("/knowledge/outputs/saved", knowledgeBaseController.listSavedOutputs);
 workspaceRouter.get("/knowledge/sessions", knowledgeBaseController.listSessions);
 workspaceRouter.post("/knowledge/sessions", knowledgeBaseController.createSession);
 workspaceRouter.get("/knowledge/sessions/:id", knowledgeBaseController.showSession);
@@ -125,6 +126,18 @@ workspaceRouter.post("/knowledge/sessions/:id/uploads/:uploadId/refresh", knowle
 workspaceRouter.patch("/knowledge/sessions/:id/uploads/:uploadId/progress", knowledgeBaseController.uploadProgress);
 workspaceRouter.post("/knowledge/sessions/:id/uploads/:uploadId/complete", knowledgeBaseController.completeUpload);
 workspaceRouter.delete("/knowledge/sessions/:id/uploads/:uploadId", knowledgeBaseController.cancelUpload);
+workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind", knowledgeBaseController.listOutputs);
+workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind", knowledgeBaseController.saveOutput);
+workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind/:outputId", knowledgeBaseController.showOutput);
+workspaceRouter.patch("/knowledge/sessions/:id/outputs/:kind/:outputId/saved", knowledgeBaseController.saveOutputFavorite);
+workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/regenerate", knowledgeBaseController.regenerateOutput);
+workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/share", knowledgeBaseController.shareOutput);
+workspaceRouter.delete("/knowledge/sessions/:id/outputs/:kind/:outputId/share", knowledgeBaseController.unshareOutput);
+workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/schemas", knowledgeBaseController.createOutputSchema);
+workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind/:outputId/schemas/:schemaId", knowledgeBaseController.showOutputSchema);
+workspaceRouter.patch("/knowledge/sessions/:id/outputs/:kind/:outputId/schemas/:schemaId", knowledgeBaseController.editOutputSchema);
+workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/schemas/:schemaId/retry", knowledgeBaseController.retryOutputSchema);
+workspaceRouter.delete("/knowledge/sessions/:id/outputs/:kind/:outputId/schemas/:schemaId", knowledgeBaseController.removeOutputSchema);
 
 // Security & Roles
 workspaceRouter.get("/security/roles", securityRoleController.getRoles);
