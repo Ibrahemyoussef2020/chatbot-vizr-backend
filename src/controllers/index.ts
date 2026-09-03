@@ -19,6 +19,7 @@ import * as gmailController from "./gmail.js";
 import * as knowledgeBaseController from "./knowledgeBase.js";
 import * as instagramWebhookController from "./instagramWebhook.js";
 import * as channelJobsController from "./channelJobs.js";
+import * as channelRecoveryController from "./channelRecovery.js";
 
 import * as dashboardOverviewController from "./dashboardOverview.js";
 import * as dashboardAnalyticsController from "./dashboardAnalytics.js";
@@ -45,6 +46,7 @@ export {
     knowledgeBaseController,
     instagramWebhookController,
     channelJobsController,
+    channelRecoveryController,
     dashboardOverviewController,
     dashboardAnalyticsController,
     threadManagementController,

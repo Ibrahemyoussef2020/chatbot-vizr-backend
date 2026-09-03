@@ -8,13 +8,24 @@ import { sendReply } from "./reply.js";
 export class ChannelReplyJobProcessor {
     async process(input: ChannelReplyJob) {
         const job = channelReplyJobSchema.parse(input);
-        const event = await WebhookEvent.findOne({ channel: job.channel, externalEventId: job.eventId }).exec();
-        if (!event) throw new Error("Webhook event ledger entry was not found.");
-        if (event.status === "completed") return { duplicate: true };
-        event.status = "processing";
-        event.attempts += 1;
-        event.lastError = "";
-        await event.save();
+        const staleBefore = new Date(Date.now() - Number(process.env.CHANNEL_PROCESSING_STALE_MS || 15 * 60_000));
+        const event = await WebhookEvent.findOneAndUpdate(
+            {
+                channel: job.channel,
+                externalEventId: job.eventId,
+                $or: [
+                    { status: { $in: ["received", "queued", "retrying", "failed"] } },
+                    { status: "processing", updatedAt: { $lt: staleBefore } },
+                ],
+            },
+            { $set: { status: "processing", lastError: "" }, $inc: { attempts: 1 } },
+            { new: true },
+        ).exec();
+        if (!event) {
+            const existing = await WebhookEvent.findOne({ channel: job.channel, externalEventId: job.eventId }).select("status").lean().exec();
+            if (existing?.status === "completed" || existing?.status === "processing") return { duplicate: true };
+            throw new Error("Webhook event ledger entry was not found.");
+        }
 
         const [conversation, inbound] = await Promise.all([
             Conversation.findById(job.conversationId).exec(),

@@ -26,12 +26,14 @@ const config = (): CloudinaryConfig => {
     const cloudName = process.env.CLOUDINARY_NAME?.trim() || parsed?.hostname;
     const apiKey = process.env.CLOUDINARY_API_KEY?.trim() || (parsed?.username ? decodeURIComponent(parsed.username) : undefined);
     const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim() || (parsed?.password ? decodeURIComponent(parsed.password) : undefined);
+   
     if (!cloudName || !apiKey || !apiSecret) {
         const missing = [
             !cloudName && "CLOUDINARY_NAME",
             !apiKey && "CLOUDINARY_API_KEY",
             !apiSecret && "CLOUDINARY_API_SECRET",
         ].filter(Boolean).join(", ");
+
         throw new CloudinaryError({
             code: "CLOUDINARY_NOT_CONFIGURED",
             message: `Cloudinary is not configured. Missing: ${missing}.`,
@@ -46,23 +48,31 @@ const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(reso
 
 export const signCloudinaryParameters = (parameters: Record<string, string | number | boolean>) => {
     const { apiSecret } = config();
+
     const payload = Object.entries(parameters)
         .filter(([, value]) => value !== "" && value !== undefined)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([key], [key2]) => key.localeCompare(key2))
         .map(([key, value]) => `${key}=${value}`)
         .join("&");
+
     return createHash("sha256").update(`${payload}${apiSecret}`).digest("hex");
 };
 
 export const createDirectUploadAuthorization = (publicId: string, resourceType: CloudinaryResourceType) => {
     const { cloudName, apiKey } = config();
+
+
     const timestamp = Math.floor(Date.now() / 1000);
+
     const notificationUrl = process.env.CLOUDINARY_NOTIFICATION_URL?.trim()
         || `${(process.env.SERVER_URL || "").replace(/\/$/, "")}/api/webhooks/cloudinary`;
+
     if (!notificationUrl.startsWith("https://")) {
         throw new CloudinaryError({ code: "CLOUDINARY_NOT_CONFIGURED", message: "A secure Cloudinary notification URL is required.", status: 500, retryable: false });
     }
+
     const parameters = { notification_url: notificationUrl, overwrite: false, public_id: publicId, timestamp, unique_filename: false };
+
     return {
         uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
         apiKey,
@@ -72,7 +82,7 @@ export const createDirectUploadAuthorization = (publicId: string, resourceType: 
     };
 };
 
-export const verifyCloudinaryNotification = (rawBody: Buffer, signature?: string, timestamp?: string) => {
+export const verifyCloudinaryNotification = (rawBody: Buffer, signature?: string, timestamp?: string): boolean => {
     if (!signature || !timestamp || !/^\d+$/.test(timestamp)) return false;
     const ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp));
     if (ageSeconds > 2 * 60 * 60) return false;

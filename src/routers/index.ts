@@ -5,7 +5,7 @@ import userRouter from "./user.js";
 import landingRouter from "./landing.js";
 import workspaceRouter from "./workspace.js";
 import subscriptionRouter from "./subscription.js";
-import { whatsappWebhookController, telegramBotController, gmailController, publicChatController, knowledgeBaseController, instagramWebhookController } from "../controllers/index.js";
+import { whatsappWebhookController, telegramBotController, gmailController, publicChatController, knowledgeBaseController, instagramWebhookController, channelRecoveryController } from "../controllers/index.js";
 import { publicRateLimit } from "../middlewares/publicRateLimit.middleware.js";
 
 const appRouter = Router();
@@ -19,6 +19,7 @@ appRouter.post("/instagram/webhook", instagramWebhookController.handle);
 appRouter.get("/google/callback", gmailController.callback);
 appRouter.post("/gmail/webhook", gmailController.webhook);
 appRouter.get("/gmail/cron/renew", gmailController.cronRenewWatches);
+appRouter.get("/internal/channel-jobs/recover", channelRecoveryController.recover);
 appRouter.get("/knowledge/shared/:token", knowledgeBaseController.showSharedOutput);
 
 appRouter.use("/auth", authRouter);

@@ -15,7 +15,8 @@ import { handleCloudinaryWebhook } from "./controllers/cloudinaryWebhook.js";
 import { KnowledgeOutputAIFactory } from "./core/knowledge/knowledge-output-ai.factory.js";
 import { VercelKnowledgeOutputProvider } from "./core/knowledge/vercel-knowledge-output.provider.js";
 import { channelReplyQueueRegistry } from "./core/jobs/channel-reply.job.js";
-import { BullMQChannelReplyQueue } from "./infrastructure/queue/bullmq-channel-reply.queue.js";
+import { VercelChannelReplyQueue } from "./infrastructure/queue/vercel-channel-reply.queue.js";
+import { ChannelReplyJobProcessor, markChannelReplyJobFailed } from "./services/channelReplyJobProcessor.js";
 
 dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
 
@@ -61,7 +62,14 @@ AIFactory.registerProvider('openai', new UnifiedAIProvider('openai', createOpenA
 AIFactory.registerProvider('anthropic', new UnifiedAIProvider('anthropic', createAnthropicModel));
 AIFactory.registerProvider('vercel', new VercelGatewayAIProvider());
 KnowledgeOutputAIFactory.registerProvider('vercel', new VercelKnowledgeOutputProvider());
-channelReplyQueueRegistry.register(new BullMQChannelReplyQueue());
+channelReplyQueueRegistry.register(new VercelChannelReplyQueue(async (job) => {
+    try {
+        await new ChannelReplyJobProcessor().process(job);
+    } catch (error) {
+        await markChannelReplyJobFailed(job, error instanceof Error ? error : new Error(String(error)), false);
+        throw error;
+    }
+}));
 
 if (!process.env.DEFAULT_AI_PROVIDER) {
     process.env.DEFAULT_AI_PROVIDER = 'vercel';

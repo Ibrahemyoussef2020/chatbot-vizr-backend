@@ -41,18 +41,13 @@ The main web, WhatsApp, Telegram, and Gmail AI reply strategy also uses Vercel A
 
 Configure `CHAT_AI_MODEL` and `CHAT_AI_FALLBACK_MODELS` independently from plan/report generation. Chat requests use two SDK retries, a bounded timeout, output-token and history limits, per-instance concurrency protection, Gateway usage attribution by workspace, and safe errors when the provider chain is unavailable.
 
-## Redis/BullMQ channel workers
+## Vercel Queue channel processing
 
-WhatsApp, Telegram, and Instagram webhook requests validate the platform event, persist inbound messages idempotently in MongoDB, enqueue a deterministic BullMQ job, and acknowledge only after Redis accepts the job. AI generation and platform delivery never run inside those webhook request lifecycles. Queue outages return a retryable response instead of silently losing an inbound event.
+WhatsApp, Telegram, and Instagram webhook requests validate the platform event, persist inbound messages idempotently in MongoDB, publish a deterministic Vercel Queue message, and acknowledge without waiting for AI work. The private `api/channel-reply-consumer.ts` function loads context, runs the AI reply strategy and its channel delivery tool, then records completion. Queue delivery uses application-level exponential backoff and acknowledges poison messages after `CHANNEL_JOB_ATTEMPTS`.
 
-Set `REDIS_URL` for both the API process and worker process, then run them independently:
+MongoDB `WebhookEvent` is the durable outbox and idempotency ledger. If publishing to the beta Queue service throws, `CHANNEL_DIRECT_FALLBACK=true` schedules the same processor with Vercel `waitUntil` while the webhook returns. A secured recovery agent scans stale outbox records and executes them directly, covering a failed fallback or a message accepted but not delivered by the Queue. Vercel invokes `/api/internal/channel-jobs/recover` daily; paid plans may safely increase that Cron frequency. Set a random `CRON_SECRET` of at least 16 characters.
 
-```bash
-npm run dev
-npm run worker:dev
-```
-
-Production uses `npm start` for the API and `npm run worker` for a continuously running worker service. Do not deploy the worker as a request-based serverless function. BullMQ retries failed jobs with exponential backoff. MongoDB `WebhookEvent` records provide durable processing status, attempt counts, failure details, and webhook idempotency. Failed jobs remain in Redis and can be inspected with `GET /api/admin/channel-jobs/failed?system_slug=<slug>` and retried using `POST /api/admin/channel-jobs/<event-id>/retry` with `system_slug` in the body.
+No Redis server or continuously running worker is required. Failed events can be inspected with `GET /api/admin/channel-jobs/failed?system_slug=<slug>` and republished using `POST /api/admin/channel-jobs/<event-id>/retry` with `system_slug` in the body.
 
 Meta POST webhooks require `X-Hub-Signature-256`. WhatsApp uses its stored app secret with `WHATSAPP_APP_SECRET`/`META_APP_SECRET` fallback. Instagram requires a `MetaChannelConfig` record containing the workspace, Instagram account ID, Facebook Page ID, Page access token, app secret, and verify token; secrets are excluded from normal queries. The Instagram callback is `/api/instagram/webhook`. Telegram continues to require its per-bot `X-Telegram-Bot-Api-Secret-Token`.
 Override the local account passwords with `SEED_ADMIN_PASSWORD` and
