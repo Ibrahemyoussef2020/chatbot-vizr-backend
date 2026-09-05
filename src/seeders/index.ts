@@ -9,6 +9,7 @@ import { seedTokenLogs } from "./tokenLog.seeder.js";
 import { seedTags } from "./tag.seeder.js";
 import { seedSystemLogs } from "./systemLog.seeder.js";
 import { seedKnowledgeOutputs } from "./knowledgeOutput.seeder.js";
+import { seedAIManagement } from "./aiManagement.seeder.js";
 
 const runSeeders = async () => {
     await connectDB();
@@ -45,9 +46,11 @@ const runSeeders = async () => {
 
     console.log("Seeding system logs...");
     const logResult = await seedSystemLogs();
+    console.log("Seeding AI management providers, models, agents, routing, quotas and telemetry...");
+    const aiResult = await seedAIManagement(workspaces);
 
     console.log(
-        `Seed complete: ${workspaces.length} workspaces (${convResult.conversations} conversations, ${tokenResult.tokenLogs} token logs, ${tagResult.tags} tags, ${logResult.logs} logs, ${knowledgeResult.sessions} knowledge sessions, ${knowledgeResult.outputs} generated outputs, ${knowledgeResult.schemas} output schemas).`,
+        `Seed complete: ${workspaces.length} workspaces (${convResult.conversations} conversations, ${tokenResult.tokenLogs} token logs, ${tagResult.tags} tags, ${logResult.logs} logs, ${aiResult.providers} AI providers, ${aiResult.models} models, ${aiResult.agents} agents, ${aiResult.logs} AI requests).`,
     );
 };
 

@@ -30,7 +30,10 @@ const defaultsFor = (workspaceId?: string) => workspaceId ? [
 const ensureDefaults = async (workspaceId?: string) => Promise.all(defaultsFor(workspaceId).map((role) =>
     SecurityRole.findOneAndUpdate(
         { workspaceId: workspaceId || null, code: role.code },
-        { $setOnInsert: { ...role, workspaceId: workspaceId || null, scope: workspaceId ? "workspace" : "business", isSystem: true, users_count: role.code === "business_owner" ? 1 : 0 } },
+        {
+            $set: { name: role.name, description: role.description, permissions: role.permissions },
+            $setOnInsert: { workspaceId: workspaceId || null, scope: workspaceId ? "workspace" : "business", isSystem: true, users_count: role.code === "business_owner" ? 1 : 0 },
+        },
         { upsert: true, new: true },
     ).exec(),
 ));

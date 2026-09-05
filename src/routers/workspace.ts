@@ -17,8 +17,9 @@ import {
     gmailController,
     knowledgeBaseController,
     channelJobsController,
+    aiManagementController,
 } from "../controllers/index.js";
-import { authenticate, validateRequest } from "../middlewares/index.js";
+import { authenticate, requirePermission, validateRequest } from "../middlewares/index.js";
 import { createWorkspaceValidator, updateWorkspaceValidator } from "../validator/index.js";
 
 const workspaceRouter = Router();
@@ -80,6 +81,28 @@ workspaceRouter.get("/ai-configs", aiConfigController.getAIConfig);
 workspaceRouter.post("/ai-configs", aiConfigController.saveAIConfig);
 workspaceRouter.put("/ai-configs/:id", aiConfigController.saveAIConfig);
 workspaceRouter.delete("/ai-configs/:id", aiConfigController.deleteAIConfig);
+
+workspaceRouter.get("/ai-management/overview", requirePermission("ai.view"), aiManagementController.overview);
+workspaceRouter.get("/ai-management/providers", requirePermission("ai.view"), aiManagementController.providers);
+workspaceRouter.patch("/ai-management/providers/:id", requirePermission("ai.providers.manage"), aiManagementController.updateProvider);
+workspaceRouter.get("/ai-management/models", requirePermission("ai.view"), aiManagementController.models);
+workspaceRouter.post("/ai-management/models", requirePermission("ai.models.manage"), aiManagementController.createModel);
+workspaceRouter.patch("/ai-management/models/:id", requirePermission("ai.models.manage"), aiManagementController.updateModel);
+workspaceRouter.delete("/ai-management/models/:id", requirePermission("ai.models.manage"), aiManagementController.deleteModel);
+workspaceRouter.get("/ai-management/agents", requirePermission("ai.view"), aiManagementController.agents);
+workspaceRouter.post("/ai-management/agents", requirePermission("ai.agents.manage"), aiManagementController.createAgent);
+workspaceRouter.patch("/ai-management/agents/:id", requirePermission("ai.agents.manage"), aiManagementController.updateAgent);
+workspaceRouter.delete("/ai-management/agents/:id", requirePermission("ai.agents.manage"), aiManagementController.deleteAgent);
+workspaceRouter.get("/ai-management/logs", requirePermission("ai.analytics.view"), aiManagementController.logs);
+workspaceRouter.get("/ai-management/routing", requirePermission("ai.view"), aiManagementController.routing);
+workspaceRouter.get("/ai-management/quotas", requirePermission("ai.view"), aiManagementController.quotas);
+workspaceRouter.post("/ai-management/routing", requirePermission("ai.routing.manage"), aiManagementController.createRouting);
+workspaceRouter.patch("/ai-management/routing/:id", requirePermission("ai.routing.manage"), aiManagementController.updateRouting);
+workspaceRouter.delete("/ai-management/routing/:id", requirePermission("ai.routing.manage"), aiManagementController.deleteRouting);
+workspaceRouter.post("/ai-management/quotas", requirePermission("ai.quotas.manage"), aiManagementController.createQuota);
+workspaceRouter.patch("/ai-management/quotas/:id", requirePermission("ai.quotas.manage"), aiManagementController.updateQuota);
+workspaceRouter.delete("/ai-management/quotas/:id", requirePermission("ai.quotas.manage"), aiManagementController.deleteQuota);
+workspaceRouter.get("/ai-management/analytics", requirePermission("ai.analytics.view"), aiManagementController.analytics);
 
 // Widget Customizer Configs
 workspaceRouter.get("/widgets-mgmt", widgetConfigController.getWidgetConfig);

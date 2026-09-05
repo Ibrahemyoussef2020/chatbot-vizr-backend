@@ -10,6 +10,8 @@ export interface AuthenticatedUserContext {
     email: string;
     role: UserRole;
     workspaceId?: string;
+    securityRoleId?: string;
+    permissions?: string[];
 }
 
 const slugify = (value: string) => value

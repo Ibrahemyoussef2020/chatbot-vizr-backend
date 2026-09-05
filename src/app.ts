@@ -10,6 +10,7 @@ import { CustomAIProvider } from "./core/ai-gateway/providers/custom.provider.js
 import { UnifiedAIProvider } from "./core/ai-gateway/providers/unified.provider.js";
 import { VercelGatewayAIProvider } from "./core/ai-gateway/providers/vercel-gateway.provider.js";
 import { createGoogleModel, createOpenAIModel, createAnthropicModel } from "./core/ai-gateway/providers/factories.js";
+import { compatibleProviderCodes, createCompatibleModelFactory } from "./core/ai-gateway/providers/compatible.factories.js";
 import aiRouter from "./core/ai-gateway/ai.route.js";
 import { handleCloudinaryWebhook } from "./controllers/cloudinaryWebhook.js";
 import { KnowledgeOutputAIFactory } from "./core/knowledge/knowledge-output-ai.factory.js";
@@ -61,6 +62,9 @@ AIFactory.registerProvider('google', new UnifiedAIProvider('google', createGoogl
 AIFactory.registerProvider('openai', new UnifiedAIProvider('openai', createOpenAIModel));
 AIFactory.registerProvider('anthropic', new UnifiedAIProvider('anthropic', createAnthropicModel));
 AIFactory.registerProvider('vercel', new VercelGatewayAIProvider());
+for (const providerCode of compatibleProviderCodes) {
+    AIFactory.registerProvider(providerCode, new UnifiedAIProvider(providerCode, createCompatibleModelFactory(providerCode)));
+}
 KnowledgeOutputAIFactory.registerProvider('vercel', new VercelKnowledgeOutputProvider());
 channelReplyQueueRegistry.register(new VercelChannelReplyQueue(async (job) => {
     try {

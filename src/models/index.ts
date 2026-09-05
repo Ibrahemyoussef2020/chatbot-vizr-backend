@@ -21,6 +21,17 @@ import KnowledgeOutput from "./KnowledgeOutput.js";
 import KnowledgeOutputSection from "./KnowledgeOutputSection.js";
 import WebhookEvent from "./WebhookEvent.js";
 import MetaChannelConfig from "./MetaChannelConfig.js";
+import Plan from "./Plan.js";
+import PaymentMethodConfig from "./PaymentMethodConfig.js";
+import Subscription from "./Subscription.js";
+import PaymentTransaction from "./PaymentTransaction.js";
+import UsageCounter from "./UsageCounter.js";
+import AIProvider from "./AIProvider.js";
+import AIModel from "./AIModel.js";
+import AIAgent from "./AIAgent.js";
+import AIRequestLog from "./AIRequestLog.js";
+import AIRoutingPolicy from "./AIRoutingPolicy.js";
+import AIQuotaPolicy from "./AIQuotaPolicy.js";
 
 export {
     User,
@@ -46,4 +57,15 @@ export {
     KnowledgeOutputSection,
     WebhookEvent,
     MetaChannelConfig,
+    Plan,
+    PaymentMethodConfig,
+    Subscription,
+    PaymentTransaction,
+    UsageCounter,
+    AIProvider,
+    AIModel,
+    AIAgent,
+    AIRequestLog,
+    AIRoutingPolicy,
+    AIQuotaPolicy,
 };

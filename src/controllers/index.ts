@@ -20,6 +20,7 @@ import * as knowledgeBaseController from "./knowledgeBase.js";
 import * as instagramWebhookController from "./instagramWebhook.js";
 import * as channelJobsController from "./channelJobs.js";
 import * as channelRecoveryController from "./channelRecovery.js";
+import * as aiManagementController from "./aiManagement.js";
 
 import * as dashboardOverviewController from "./dashboardOverview.js";
 import * as dashboardAnalyticsController from "./dashboardAnalytics.js";
@@ -47,6 +48,7 @@ export {
     instagramWebhookController,
     channelJobsController,
     channelRecoveryController,
+    aiManagementController,
     dashboardOverviewController,
     dashboardAnalyticsController,
     threadManagementController,
