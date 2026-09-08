@@ -1,14 +1,12 @@
 import { Workspace, AIConfig } from "../models/index.js";
 
-const resolveWorkspace = async (slug?: string) => {
-    if (!slug) {
-        return await Workspace.findOne().sort({ createdAt: 1 }).exec();
-    }
-    return await Workspace.findOne({ slug: slug.toLowerCase() }).exec();
-};
+import { resolveWorkspace } from "./aiManagement.js";
+import type { AuthenticatedUserContext } from "./workspaces.js";
+import { validateStructuredKnowledge } from "./structuredKnowledge.js";
+import { notFoundError } from "../core/shared/errors/HttpError.js";
 
-export const getAIConfigService = async (systemSlug?: string) => {
-    const ws = await resolveWorkspace(systemSlug);
+export const getAIConfigService = async (user: AuthenticatedUserContext, systemSlug?: string) => {
+    const ws = await resolveWorkspace(user, systemSlug);
     if (!ws) return null;
 
     let config = await AIConfig.findOne({ workspaceId: ws._id }).exec();
@@ -52,11 +50,12 @@ export const getAIConfigService = async (systemSlug?: string) => {
         contact_collection_rules: config.contact_collection_rules,
         actions_data: config.actions_data || [],
         uploaded_files: config.uploaded_files || [],
+        structured_knowledge: config.structured_knowledge || {},
     };
 };
 
-export const saveAIConfigService = async (systemSlug?: string, payload?: any) => {
-    const ws = await resolveWorkspace(systemSlug);
+export const saveAIConfigService = async (user: AuthenticatedUserContext, systemSlug?: string, payload?: any) => {
+    const ws = await resolveWorkspace(user, systemSlug);
     if (!ws) throw new Error("Workspace not found.");
 
     let config = await AIConfig.findOne({ workspaceId: ws._id }).exec();
@@ -77,12 +76,21 @@ export const saveAIConfigService = async (systemSlug?: string, payload?: any) =>
     if (payload?.actions_data !== undefined) config.actions_data = payload.actions_data;
     if (payload?.uploaded_files !== undefined) config.uploaded_files = payload.uploaded_files;
 
+    if (payload?.structured_knowledge !== undefined) {
+        config.structured_knowledge = validateStructuredKnowledge(payload.structured_knowledge);
+        config.markModified("structured_knowledge");
+    }
     await config.save();
 
-    return getAIConfigService(ws.slug);
+    return getAIConfigService(user, ws.slug);
 };
 
-export const deleteAIConfigService = async (configId: string) => {
-    await AIConfig.findByIdAndDelete(configId).exec();
+export const deleteAIConfigService = async (user: AuthenticatedUserContext, configId: string) => {
+    const config = await AIConfig.findById(configId);
+    if (!config) throw notFoundError("Configuration not found.");
+    const workspace = await Workspace.findById(config.workspaceId);
+    if (!workspace) throw notFoundError("Workspace not found.");
+    await resolveWorkspace(user, workspace.slug);
+    await config.deleteOne();
     return true;
 };

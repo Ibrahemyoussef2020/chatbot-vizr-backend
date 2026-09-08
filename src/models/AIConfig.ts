@@ -26,6 +26,7 @@ export interface IAIConfig extends Document {
     contact_collection_rules: string;
     actions_data: IActionData[];
     uploaded_files: IUploadedFile[];
+    structured_knowledge: Record<string, unknown>;
 }
 
 const AIConfigSchema = new Schema<IAIConfig>(
@@ -48,6 +49,7 @@ const AIConfigSchema = new Schema<IAIConfig>(
                 description: { type: String, default: "" },
             },
         ],
+        structured_knowledge: { type: Schema.Types.Mixed, default: () => ({}) },
         uploaded_files: [
             {
                 name: { type: String, default: "" },
