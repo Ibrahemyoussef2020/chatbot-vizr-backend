@@ -84,7 +84,7 @@ const toProviderView = (provider: any) => {
 export const getAIOverviewService = async (
     user: AuthenticatedUserContext,
     slug?: string,
-    source: "runtime" | "demo" | "all" = "runtime",
+    source: "runtime" | "demo" | "all" = "all",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
     await ensureProviders();
@@ -390,7 +390,7 @@ export const saveAIRuntimeService = async (
 export const listAIRequestLogsService = async (
     user: AuthenticatedUserContext,
     slug?: string,
-    source: "runtime" | "demo" | "all" = "runtime",
+    source: "runtime" | "demo" | "all" = "all",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
 
@@ -595,7 +595,7 @@ export const deleteAIQuotaService = async (
 export const getAIAnalyticsService = async (
     user: AuthenticatedUserContext,
     slug?: string,
-    source: "runtime" | "demo" | "all" = "runtime",
+    source: "runtime" | "demo" | "all" = "all",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
     const match = { workspaceId: workspace._id, ...(source === "all" ? {} : { source }), createdAt: { $gte: new Date(Date.now() - 30 * 86400000) } };
