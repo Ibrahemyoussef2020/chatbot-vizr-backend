@@ -84,12 +84,13 @@ const toProviderView = (provider: any) => {
 export const getAIOverviewService = async (
     user: AuthenticatedUserContext,
     slug?: string,
+    source: "runtime" | "demo" = "runtime",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
     await ensureProviders();
 
     const scope = { workspaceId: workspace._id };
-    const runtimeScope = { ...scope, source: "runtime" as const };
+    const runtimeScope = { ...scope, source };
     const [providers, models, agents, requests, successful, failed, usage] =
         await Promise.all([
             AIProvider.countDocuments({ enabled: true }),
@@ -389,10 +390,11 @@ export const saveAIRuntimeService = async (
 export const listAIRequestLogsService = async (
     user: AuthenticatedUserContext,
     slug?: string,
+    source: "runtime" | "demo" = "runtime",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
 
-    return AIRequestLog.find({ workspaceId: workspace._id, source: "runtime" })
+    return AIRequestLog.find({ workspaceId: workspace._id, source })
         .sort({ createdAt: -1 })
         .limit(200)
         .lean();
@@ -593,9 +595,10 @@ export const deleteAIQuotaService = async (
 export const getAIAnalyticsService = async (
     user: AuthenticatedUserContext,
     slug?: string,
+    source: "runtime" | "demo" = "runtime",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
-    const match = { workspaceId: workspace._id, source: "runtime", createdAt: { $gte: new Date(Date.now() - 30 * 86400000) } };
+    const match = { workspaceId: workspace._id, source, createdAt: { $gte: new Date(Date.now() - 30 * 86400000) } };
 
     const [providers, daily, statuses] = await Promise.all([
         AIRequestLog.aggregate([

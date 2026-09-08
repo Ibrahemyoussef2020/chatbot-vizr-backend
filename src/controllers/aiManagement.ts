@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 import * as service from "../services/aiManagement.js";
 const slug = (req: Request) => typeof req.query.system_slug === "string" ? req.query.system_slug : undefined;
+const trafficSource = (req: Request): "runtime" | "demo" => req.query.source === "demo" ? "demo" : "runtime";
 const id = (req: Request) => String(req.params.id);
 const readRuntime = async (req: Request, res: Response) => {
     const data = await service.getAIRuntimeService(res.locals.user, slug(req));
@@ -13,7 +14,7 @@ const writeRuntime = async (req: Request, res: Response) => {
 };
 export const runtime = asyncHandler(readRuntime);
 export const updateRuntime = asyncHandler(writeRuntime);
-export const overview = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.getAIOverviewService(res.locals.user, slug(req)) }); });
+export const overview = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.getAIOverviewService(res.locals.user, slug(req), trafficSource(req)) }); });
 export const providers = asyncHandler(async (_req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIProvidersService() }); });
 const writeProvider = async (req: Request, res: Response) => {
     const data = await service.updateAIProviderService(id(req), req.body, res.locals.user);
@@ -40,7 +41,7 @@ export const agents = asyncHandler(async (req: Request, res: Response) => { res.
 export const createAgent = asyncHandler(async (req: Request, res: Response) => { res.status(201).json({ success: true, data: await service.saveAIAgentService(res.locals.user, slug(req), req.body) }); });
 export const updateAgent = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.saveAIAgentService(res.locals.user, slug(req), req.body, id(req)) }); });
 export const deleteAgent = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.deleteAIAgentService(res.locals.user, slug(req), id(req)) }); });
-export const logs = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIRequestLogsService(res.locals.user, slug(req)) }); });
+export const logs = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIRequestLogsService(res.locals.user, slug(req), trafficSource(req)) }); });
 export const routing = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIRoutingService(res.locals.user, slug(req)) }); });
 export const quotas = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIQuotasService(res.locals.user, slug(req)) }); });
 export const createRouting = asyncHandler(async (req: Request, res: Response) => { res.status(201).json({ success: true, data: await service.saveAIRoutingService(res.locals.user, slug(req), req.body) }); });
@@ -49,4 +50,4 @@ export const deleteRouting = asyncHandler(async (req: Request, res: Response) =>
 export const createQuota = asyncHandler(async (req: Request, res: Response) => { res.status(201).json({ success: true, data: await service.saveAIQuotaService(res.locals.user, slug(req), req.body) }); });
 export const updateQuota = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.saveAIQuotaService(res.locals.user, slug(req), req.body, id(req)) }); });
 export const deleteQuota = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.deleteAIQuotaService(res.locals.user, slug(req), id(req)) }); });
-export const analytics = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.getAIAnalyticsService(res.locals.user, slug(req)) }); });
+export const analytics = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.getAIAnalyticsService(res.locals.user, slug(req), trafficSource(req)) }); });

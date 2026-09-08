@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "tsx src/seeders/index.ts",
+    "seed:ai:production": "node dist/src/seeders/aiManagementProduction.js",
     "test": "tsx --test src/**/*.test.ts"
   },
   "keywords": [],
