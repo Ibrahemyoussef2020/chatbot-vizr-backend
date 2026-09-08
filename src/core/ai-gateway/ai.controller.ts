@@ -1,28 +1,30 @@
 import { Request, Response, NextFunction } from 'express';
-import { AIFactory } from './ai-gateway.factory.js';
+import { runAIGateway } from '../../services/aiGateway.js';
 
 export class AIController {
     public static async handleStream(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { messages, provider, options } = req.body;
-            const providerService = AIFactory.getProvider(provider);
-
-            await providerService.stream(messages, res, options);
+            await runAIGateway(res.locals.user, req.body, {
+                run: async (provider, history, options) => {
+                    await provider.stream(history, res, options);
+                    return "";
+                },
+                isCommitted: () => res.headersSent,
+            });
         } catch (error) {
-            console.error('[AIController] Stream Handling Error:', error);
+            if (res.headersSent) {
+                res.destroy();
+                return;
+            }
             next(error);
         }
     }
 
     public static async handleGenerate(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { prompt, provider, options } = req.body;
-            const providerService = AIFactory.getProvider(provider);
-
-            const resultText = await providerService.generate(prompt, options);
+            const resultText = await runAIGateway(res.locals.user, req.body);
             res.status(200).json({ success: true, text: resultText });
         } catch (error) {
-            console.error('[AIController] Generate Handling Error:', error);
             next(error);
         }
     }

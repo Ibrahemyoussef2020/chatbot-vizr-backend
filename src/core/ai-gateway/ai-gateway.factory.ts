@@ -1,4 +1,5 @@
 import { IAIService } from './ai.interface.js';
+import { assertAIProviderEnabled } from '../../services/aiProviderPolicy.js';
 
 export type AIProviderType = 'vercel' | 'custom' | string;
 
@@ -20,6 +21,15 @@ export class AIFactory {
                 `Make sure to register it using AIFactory.registerProvider()`
             );
         }
-        return service;
+        return {
+            async generate(prompt, options) {
+                await assertAIProviderEnabled(provider);
+                return service.generate(prompt, options);
+            },
+            async stream(messages, response, options) {
+                await assertAIProviderEnabled(provider);
+                await service.stream(messages, response, options);
+            },
+        };
     }
 }

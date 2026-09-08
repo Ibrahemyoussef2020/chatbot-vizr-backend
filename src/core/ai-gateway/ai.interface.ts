@@ -6,6 +6,10 @@ export interface AIGatewayOptions {
     temperature?: number;
     maxTokens?: number;
     systemPrompt?: string;
+    timeoutMs?: number;
+    maxRetries?: number;
+    fallbackModels?: string[];
+    onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
     [key: string]: any;
 }
 

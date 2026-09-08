@@ -1,6 +1,10 @@
 export interface ProviderDefinition { code: string; name: string; keyEnvName: string; accountEnvName?: string; baseUrl?: string; }
 
 export const providerDefinitions: ProviderDefinition[] = [
+    { code: "vercel", name: "Vercel AI Gateway", keyEnvName: "AI_GATEWAY_API_KEY" },
+    { code: "openai", name: "OpenAI", keyEnvName: "OPENAI_API_KEY" },
+    { code: "anthropic", name: "Anthropic", keyEnvName: "ANTHROPIC_API_KEY" },
+    { code: "custom", name: "Custom AI Service", keyEnvName: "CUSTOM_AI_API_URL" },
     { code: "google", name: "Google Gemini", keyEnvName: "GOOGLE_GENERATIVE_AI_API_KEY" },
     { code: "openrouter", name: "OpenRouter", keyEnvName: "OPENROUTER_API_KEY", baseUrl: "https://openrouter.ai/api/v1" },
     { code: "cohere", name: "Cohere", keyEnvName: "COHERE_API_KEY" },

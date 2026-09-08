@@ -83,6 +83,8 @@ workspaceRouter.put("/ai-configs/:id", aiConfigController.saveAIConfig);
 workspaceRouter.delete("/ai-configs/:id", aiConfigController.deleteAIConfig);
 
 workspaceRouter.get("/ai-management/overview", requirePermission("ai.view"), aiManagementController.overview);
+workspaceRouter.get("/ai-management/runtime", requirePermission("ai.view"), aiManagementController.runtime);
+workspaceRouter.patch("/ai-management/runtime", requirePermission("ai.agents.manage"), aiManagementController.updateRuntime);
 workspaceRouter.get("/ai-management/providers", requirePermission("ai.view"), aiManagementController.providers);
 workspaceRouter.patch("/ai-management/providers/:id", requirePermission("ai.providers.manage"), aiManagementController.updateProvider);
 workspaceRouter.get("/ai-management/models", requirePermission("ai.view"), aiManagementController.models);

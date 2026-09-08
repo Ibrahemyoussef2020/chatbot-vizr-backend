@@ -23,9 +23,16 @@ export class UnifiedAIProvider implements IAIService {
                 temperature: options?.temperature ?? 0.7,
                 maxOutputTokens: options?.maxTokens,
                 system: options?.systemPrompt,
+                maxRetries: options?.maxRetries ?? 2,
+                abortSignal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
             });
 
             result.pipeTextStreamToResponse(res);
+            await result.text;
+            const usage = await result.usage;
+            if (typeof usage.inputTokens === "number" && typeof usage.outputTokens === "number") {
+                options?.onUsage?.({ inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+            }
         } catch (error) {
             console.error(`[UnifiedAIProvider:${this.providerName}] Stream Error:`, error);
             throw error;
@@ -36,14 +43,19 @@ export class UnifiedAIProvider implements IAIService {
         try {
             const model = this.getModel(options);
             const isString = typeof prompt === 'string';
-            const { text } = await generateText({
+            const { text, usage } = await generateText({
                 model,
                 ...(isString ? { prompt } : { messages: prompt }),
                 temperature: options?.temperature ?? 0.7,
                 maxOutputTokens: options?.maxTokens,
                 system: options?.systemPrompt,
+                maxRetries: options?.maxRetries ?? 2,
+                abortSignal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
             });
 
+            if (typeof usage.inputTokens === "number" && typeof usage.outputTokens === "number") {
+                options?.onUsage?.({ inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+            }
             return text;
         } catch (error) {
             console.error(`[UnifiedAIProvider:${this.providerName}] Generate Error:`, error);

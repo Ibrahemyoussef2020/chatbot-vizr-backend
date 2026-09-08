@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import AIProvider from "../../models/AIProvider.js";
 import { KnowledgeOutputAIFactory } from "./knowledge-output-ai.factory.js";
 import { generatedKnowledgeOutputSchema, type IKnowledgeOutputAI } from "./knowledge-output-ai.interface.js";
 
@@ -10,7 +11,10 @@ const normalizedOutput = {
     schemas: [{ key: "work-plan", order: 0, title: "Work Plan", description: "Execute in phases.", notes: [], charts: [] }],
 };
 
-test("knowledge AI factory returns providers through one normalized contract", async () => {
+test("knowledge AI factory returns providers through one normalized contract", async (context) => {
+    context.mock.method(AIProvider, "findOne", () => ({
+        select: () => ({ lean: () => ({ exec: async () => null }) }),
+    }));
     const provider: IKnowledgeOutputAI = { generate: async () => normalizedOutput };
     KnowledgeOutputAIFactory.registerProvider("test", provider);
     const result = await KnowledgeOutputAIFactory.getProvider("test").generate({ kind: "plan", sessionTitle: "Session", sources: [] });

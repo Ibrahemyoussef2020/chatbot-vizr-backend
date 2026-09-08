@@ -7,6 +7,7 @@ export interface IWorkspace extends Document {
     isActive: boolean;
     rateLimit: number;
     webhookUrl?: string;
+    defaultAiAgentId?: Types.ObjectId | null;
 }
 
 const WorkspaceSchema = new Schema<IWorkspace>(
@@ -17,6 +18,7 @@ const WorkspaceSchema = new Schema<IWorkspace>(
         isActive: { type: Boolean, default: true, index: true },
         rateLimit: { type: Number, default: 60, min: 1, max: 1000 },
         webhookUrl: { type: String, default: "" },
+        defaultAiAgentId: { type: Schema.Types.ObjectId, ref: "AIAgent", default: null },
     },
     { timestamps: true },
 );

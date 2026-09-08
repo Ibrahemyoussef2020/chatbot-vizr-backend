@@ -13,7 +13,7 @@ export const resolveChatGatewayConfig = (modelOverride?: string) => {
     return { apiKey, primary, fallbacks };
 };
 
-const requestSettings = (options?: AIGatewayOptions) => {
+export const requestSettings = (options?: AIGatewayOptions) => {
     const config = resolveChatGatewayConfig(options?.model);
     const gateway = createGateway({ apiKey: config.apiKey });
     return {
@@ -21,11 +21,11 @@ const requestSettings = (options?: AIGatewayOptions) => {
         model: gateway(config.primary),
         temperature: options?.temperature ?? 0.35,
         maxOutputTokens: options?.maxTokens ?? Number(process.env.CHAT_AI_MAX_OUTPUT_TOKENS || 1200),
-        maxRetries: 2,
-        abortSignal: AbortSignal.timeout(Number(process.env.CHAT_AI_TIMEOUT_MS || 45_000)),
+        maxRetries: options?.maxRetries ?? 2,
+        abortSignal: AbortSignal.timeout(options?.timeoutMs ?? Number(process.env.CHAT_AI_TIMEOUT_MS || 45_000)),
         providerOptions: {
             gateway: {
-                models: config.fallbacks,
+                models: options?.fallbackModels ?? config.fallbacks,
                 caching: "auto" as const,
                 tags: ["customer-chat"],
                 user: typeof options?.gatewayUser === "string" ? options.gatewayUser : undefined,
@@ -49,6 +49,11 @@ export class VercelGatewayAIProvider implements IAIService {
             providerOptions: settings.providerOptions,
         });
         result.pipeTextStreamToResponse(res);
+        await result.text;
+        const usage = await result.usage;
+        if (typeof usage.inputTokens === "number" && typeof usage.outputTokens === "number") {
+            options?.onUsage?.({ inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+        }
     }
 
     async generate(prompt: string | ModelMessage[], options?: AIGatewayOptions): Promise<string> {
@@ -63,6 +68,9 @@ export class VercelGatewayAIProvider implements IAIService {
             abortSignal: settings.abortSignal,
             providerOptions: settings.providerOptions,
         });
+        if (typeof result.usage.inputTokens === "number" && typeof result.usage.outputTokens === "number") {
+            options?.onUsage?.({ inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens });
+        }
         return result.text;
     }
 }

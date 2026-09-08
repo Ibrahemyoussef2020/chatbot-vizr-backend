@@ -14,23 +14,23 @@ export const CoreMessageSchema = z.object({
     ]),
 });
 
+const GatewayOptionsSchema = z.object({
+    model: z.string().trim().min(1).max(240).optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().int().min(1).max(100000).optional(),
+    systemPrompt: z.string().max(32000).optional(),
+    systemSlug: z.string().trim().min(1).max(255).optional(),
+    threadId: z.string().trim().min(1).max(255).optional(),
+});
+
 export const StreamRequestSchema = z.object({
     messages: z.array(CoreMessageSchema),
     provider: z.string().optional().default('vercel'),
-    options: z.object({
-        model: z.string().optional(),
-        temperature: z.number().min(0).max(2).optional(),
-        maxTokens: z.number().positive().optional(),
-        systemPrompt: z.string().optional(),
-    }).catchall(z.any()).optional(),
+    options: GatewayOptionsSchema.optional(),
 });
 
 export const GenerateRequestSchema = z.object({
     prompt: z.union([z.string(), z.array(CoreMessageSchema)]),
     provider: z.string().optional().default('vercel'),
-    options: z.object({
-        model: z.string().optional(),
-        temperature: z.number().optional(),
-        maxTokens: z.number().optional(),
-    }).catchall(z.any()).optional(),
+    options: GatewayOptionsSchema.optional(),
 });

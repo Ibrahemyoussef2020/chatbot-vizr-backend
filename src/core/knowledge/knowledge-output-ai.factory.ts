@@ -1,4 +1,5 @@
 import type { IKnowledgeOutputAI } from "./knowledge-output-ai.interface.js";
+import { assertAIProviderEnabled } from "../../services/aiProviderPolicy.js";
 
 export type KnowledgeAIProviderType = "vercel" | "custom" | string;
 
@@ -12,6 +13,11 @@ export class KnowledgeOutputAIFactory {
     static getProvider(name: KnowledgeAIProviderType = "vercel"): IKnowledgeOutputAI {
         const provider = this.providers.get(name);
         if (!provider) throw new Error(`Knowledge AI provider "${name}" is not registered.`);
-        return provider;
+        return {
+            async generate(input) {
+                await assertAIProviderEnabled(name);
+                return provider.generate(input);
+            },
+        };
     }
 }

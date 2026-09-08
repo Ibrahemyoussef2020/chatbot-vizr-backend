@@ -12,6 +12,8 @@ const AIRequestLogSchema = new Schema({
     statusCode: { type: Number }, errorCode: { type: String }, errorMessage: { type: String },
     fallbackAttempts: { type: Number, default: 0 }, estimatedCostUsd: { type: Number, default: 0 },
     correlationId: { type: String, required: true, unique: true },
+    source: { type: String, enum: ["runtime", "demo"], default: "demo", index: true },
+    usageReported: { type: Boolean, default: false },
 }, { timestamps: true });
 AIRequestLogSchema.index({ workspaceId: 1, createdAt: -1 });
 export default mongoose.model("AIRequestLog", AIRequestLogSchema);

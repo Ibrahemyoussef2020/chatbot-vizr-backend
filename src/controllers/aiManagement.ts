@@ -3,13 +3,39 @@ import { asyncHandler } from "../middlewares/asyncHandler.js";
 import * as service from "../services/aiManagement.js";
 const slug = (req: Request) => typeof req.query.system_slug === "string" ? req.query.system_slug : undefined;
 const id = (req: Request) => String(req.params.id);
+const readRuntime = async (req: Request, res: Response) => {
+    const data = await service.getAIRuntimeService(res.locals.user, slug(req));
+    res.status(200).json({ success: true, data });
+};
+const writeRuntime = async (req: Request, res: Response) => {
+    const data = await service.saveAIRuntimeService(res.locals.user, slug(req), req.body);
+    res.status(200).json({ success: true, data });
+};
+export const runtime = asyncHandler(readRuntime);
+export const updateRuntime = asyncHandler(writeRuntime);
 export const overview = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.getAIOverviewService(res.locals.user, slug(req)) }); });
 export const providers = asyncHandler(async (_req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIProvidersService() }); });
-export const updateProvider = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.updateAIProviderService(id(req), req.body) }); });
+const writeProvider = async (req: Request, res: Response) => {
+    const data = await service.updateAIProviderService(id(req), req.body, res.locals.user);
+    res.status(200).json({ success: true, data });
+};
+export const updateProvider = asyncHandler(writeProvider);
 export const models = asyncHandler(async (_req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIModelsService() }); });
-export const createModel = asyncHandler(async (req: Request, res: Response) => { res.status(201).json({ success: true, data: await service.saveAIModelService(req.body) }); });
-export const updateModel = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.saveAIModelService(req.body, id(req)) }); });
-export const deleteModel = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.deleteAIModelService(id(req)) }); });
+const addModel = async (req: Request, res: Response) => {
+    const data = await service.saveAIModelService(res.locals.user, req.body);
+    res.status(201).json({ success: true, data });
+};
+const writeModel = async (req: Request, res: Response) => {
+    const data = await service.saveAIModelService(res.locals.user, req.body, id(req));
+    res.status(200).json({ success: true, data });
+};
+const removeModel = async (req: Request, res: Response) => {
+    const data = await service.deleteAIModelService(id(req), res.locals.user);
+    res.status(200).json({ success: true, data });
+};
+export const createModel = asyncHandler(addModel);
+export const updateModel = asyncHandler(writeModel);
+export const deleteModel = asyncHandler(removeModel);
 export const agents = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.listAIAgentsService(res.locals.user, slug(req)) }); });
 export const createAgent = asyncHandler(async (req: Request, res: Response) => { res.status(201).json({ success: true, data: await service.saveAIAgentService(res.locals.user, slug(req), req.body) }); });
 export const updateAgent = asyncHandler(async (req: Request, res: Response) => { res.status(200).json({ success: true, data: await service.saveAIAgentService(res.locals.user, slug(req), req.body, id(req)) }); });

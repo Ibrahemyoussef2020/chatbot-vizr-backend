@@ -15,21 +15,32 @@ export class CustomAIProvider implements IAIService {
             const response = await axios.post(
                 `${this.customApiUrl}/stream`,
                 { messages, ...options },
-                { responseType: 'stream' }
+                { responseType: 'stream', timeout: options?.timeoutMs ?? 45000 }
             );
 
-            response.data.on('data', (chunk: Buffer) => {
-                res.write(chunk);
-            });
-
-            response.data.on('end', () => {
-                res.end();
-            });
-
-            response.data.on('error', (err: Error) => {
-                console.error('[CustomAIProvider] Stream read error:', err);
-                res.write(`data: ${JSON.stringify({ error: 'Internal API Stream interrupted' })}\n\n`);
-                res.end();
+            await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    response.data.destroy();
+                    reject(new Error("Custom AI stream timed out."));
+                }, options?.timeoutMs ?? 45000);
+                const onClose = () => {
+                    response.data.destroy();
+                    clearTimeout(timeout);
+                    reject(new Error("AI stream connection closed."));
+                };
+                res.once("close", onClose);
+                response.data.on("data", (chunk: Buffer) => res.write(chunk));
+                response.data.once("end", () => {
+                    clearTimeout(timeout);
+                    res.off("close", onClose);
+                    res.end();
+                    resolve();
+                });
+                response.data.once("error", (error: Error) => {
+                    clearTimeout(timeout);
+                    res.off("close", onClose);
+                    reject(error);
+                });
             });
         } catch (error: any) {
             console.error('[CustomAIProvider] Axois Connection Error:', error.message);
@@ -42,7 +53,7 @@ export class CustomAIProvider implements IAIService {
             const response = await axios.post(`${this.customApiUrl}/generate`, {
                 prompt,
                 ...options,
-            });
+            }, { timeout: options?.timeoutMs ?? 45000 });
             return response.data.text;
         } catch (error: any) {
             console.error('[CustomAIProvider] Generate request error:', error.message);

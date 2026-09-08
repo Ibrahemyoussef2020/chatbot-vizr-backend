@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { StreamRequestSchema, GenerateRequestSchema } from './ai.lib.js';
 import { ZodError } from 'zod';
+import { createHttpError } from '../shared/errors/HttpError.js';
 
 export class AIMiddleware {
     public static validateStreamPayload(req: Request, res: Response, next: NextFunction): void {
@@ -9,7 +10,7 @@ export class AIMiddleware {
             next();
         } catch (error) {
             if (error instanceof ZodError) {
-                res.status(400).json({ error: 'Invalid stream request payload.', details: error.issues });
+                next(createHttpError(400, 'Invalid stream request payload.'));
                 return;
             }
             next(error);
@@ -22,7 +23,7 @@ export class AIMiddleware {
             next();
         } catch (error) {
             if (error instanceof ZodError) {
-                res.status(400).json({ error: 'Invalid generate request payload.', details: error.issues });
+                next(createHttpError(400, 'Invalid generate request payload.'));
                 return;
             }
             next(error);
