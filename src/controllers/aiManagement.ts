@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 import * as service from "../services/aiManagement.js";
 const slug = (req: Request) => typeof req.query.system_slug === "string" ? req.query.system_slug : undefined;
-const trafficSource = (req: Request): "runtime" | "demo" => req.query.source === "demo" ? "demo" : "runtime";
+const trafficSource = (req: Request): "runtime" | "demo" | "all" => req.query.source === "all" ? "all" : req.query.source === "demo" ? "demo" : "runtime";
 const id = (req: Request) => String(req.params.id);
 const readRuntime = async (req: Request, res: Response) => {
     const data = await service.getAIRuntimeService(res.locals.user, slug(req));

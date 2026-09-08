@@ -5,8 +5,9 @@ import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { AIAgent, AIModel, AIProvider, AIQuotaPolicy, AIRequestLog, AIRoutingPolicy, SecurityRole, Workspace } from "../models/index.js";
 import { seedProductionAIManagement } from "./aiManagementProduction.seeder.js";
+import { seedAIQuotaBaseline } from "./aiQuotaBaseline.seeder.js";
 import { seedAITraffic } from "./aiTraffic.seeder.js";
-import { getAIAnalyticsService, listAIRequestLogsService, getAIOverviewService } from "../services/aiManagement.js";
+import { getAIAnalyticsService, listAIRequestLogsService, getAIOverviewService, listAIQuotasService } from "../services/aiManagement.js";
 
 test("production starter seed preserves settings, telemetry and tenant boundaries on reruns", async () => {
     const server = await MongoMemoryServer.create({
@@ -52,6 +53,15 @@ test("production starter seed preserves settings, telemetry and tenant boundarie
         assert.equal(analytics.statuses.length, 3);
         assert.equal((await listAIRequestLogsService(user, "brand", "demo")).length, 200);
         assert.equal((await listAIRequestLogsService(user, "brand")).length, 1);
+        assert.equal((await getAIOverviewService(user, "brand", "all")).requests, 1201);
+        assert.equal((await seedAIQuotaBaseline(["brand"])).inserted, 1);
+        assert.equal((await seedAIQuotaBaseline(["brand"])).inserted, 0);
+        const budget = await AIQuotaPolicy.findOne({ workspaceId: workspace._id }).orFail();
+        assert.equal(budget.usedTokens, 0);
+        await AIQuotaPolicy.updateOne({ _id: budget._id }, { runtimeInitialized: true, usedTokens: 20, resetAt: new Date(Date.now() + 60000) });
+        const dashboardQuotas = await listAIQuotasService(user, "brand");
+        assert.equal(dashboardQuotas[0].usedTokens, 570020);
+
     } finally {
         await mongoose.disconnect();
         await server.stop();

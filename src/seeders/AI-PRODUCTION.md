@@ -1,3 +1,20 @@
+# Current dashboard behavior ? 2026-09-08
+
+The dashboard now requests `source=all` for overview, analytics and execution logs. Seeded MongoDB records and incoming runtime records are displayed together, with no source selector or demo banner. Internal source provenance is retained for routing and enforcement. API callers that omit source still get runtime-only results.
+
+Quota display is backed by `AIQuotaPolicy.dashboardBaseline` plus active runtime usage. Baselines are inserted once, never rewritten on reruns, and are excluded from live quota admission. Hardcoded frontend utilization percentages have been removed. Runtime usage resets by its configured period; the display baseline remains the seeded starting value.
+
+```powershell
+npm run build
+npm run seed:ai:production -- --env-file .env.production --workspace brand-ecommerce --workspace vizr --workspace ibrahem-portfolio --quota-baseline --apply
+```
+
+Validation: 55 tests pass, including combined log totals and additive quota display with unchanged enforcement counters. Both builds and targeted frontend lint pass. The seeder uses the existing MongoDB DNS fallback and retry logic.
+
+The earlier implementation notes below are historical; their source-selector and banner descriptions are superseded by this section.
+
+---
+
 # Production AI starter configuration
 
 Do not run the general `npm run seed` against production: it replaces demo settings, accounts and synthetic telemetry.

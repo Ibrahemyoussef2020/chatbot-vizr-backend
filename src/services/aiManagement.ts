@@ -84,13 +84,13 @@ const toProviderView = (provider: any) => {
 export const getAIOverviewService = async (
     user: AuthenticatedUserContext,
     slug?: string,
-    source: "runtime" | "demo" = "runtime",
+    source: "runtime" | "demo" | "all" = "runtime",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
     await ensureProviders();
 
     const scope = { workspaceId: workspace._id };
-    const runtimeScope = { ...scope, source };
+    const runtimeScope = { ...scope, ...(source === "all" ? {} : { source }) };
     const [providers, models, agents, requests, successful, failed, usage] =
         await Promise.all([
             AIProvider.countDocuments({ enabled: true }),
@@ -390,11 +390,11 @@ export const saveAIRuntimeService = async (
 export const listAIRequestLogsService = async (
     user: AuthenticatedUserContext,
     slug?: string,
-    source: "runtime" | "demo" = "runtime",
+    source: "runtime" | "demo" | "all" = "runtime",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
 
-    return AIRequestLog.find({ workspaceId: workspace._id, source })
+    return AIRequestLog.find({ workspaceId: workspace._id, ...(source === "all" ? {} : { source }) })
         .sort({ createdAt: -1 })
         .limit(200)
         .lean();
@@ -519,8 +519,8 @@ export const listAIQuotasService = async (
     const now = new Date();
     return quotas.map(({ leases, ...quota }) => ({
         ...quota,
-        usedRequests: quota.runtimeInitialized && quota.resetAt && quota.resetAt > now ? quota.usedRequests : 0,
-        usedTokens: quota.runtimeInitialized && quota.resetAt && quota.resetAt > now ? quota.usedTokens : 0,
+        usedRequests: (quota.dashboardBaseline?.requests ?? 0) + (quota.runtimeInitialized && quota.resetAt && quota.resetAt > now ? quota.usedRequests : 0),
+        usedTokens: (quota.dashboardBaseline?.tokens ?? 0) + (quota.runtimeInitialized && quota.resetAt && quota.resetAt > now ? quota.usedTokens : 0),
         activeRequests: (leases ?? []).filter(lease => lease.expiresAt > now).length,
     }));
 };
@@ -595,10 +595,10 @@ export const deleteAIQuotaService = async (
 export const getAIAnalyticsService = async (
     user: AuthenticatedUserContext,
     slug?: string,
-    source: "runtime" | "demo" = "runtime",
+    source: "runtime" | "demo" | "all" = "runtime",
 ) => {
     const workspace = await resolveWorkspace(user, slug);
-    const match = { workspaceId: workspace._id, source, createdAt: { $gte: new Date(Date.now() - 30 * 86400000) } };
+    const match = { workspaceId: workspace._id, ...(source === "all" ? {} : { source }), createdAt: { $gte: new Date(Date.now() - 30 * 86400000) } };
 
     const [providers, daily, statuses] = await Promise.all([
         AIRequestLog.aggregate([
