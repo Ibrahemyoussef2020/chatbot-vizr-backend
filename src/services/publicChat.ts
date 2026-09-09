@@ -4,6 +4,14 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { sendReply } from "./reply.js";
 
+const defaultPublicChatSystemSlug = () =>
+    process.env.PUBLIC_CHAT_SYSTEM_SLUG?.trim() || "brand-ecommerce";
+
+const normalizePublicChatSystemSlug = (systemSlug?: string) => {
+    const value = systemSlug?.trim();
+    return !value || value === "demo" ? defaultPublicChatSystemSlug() : value;
+};
+
 // Permanent ID lookup helper (never expires, auto-creates if missing by ID)
 export const findOrCreateConversationById = async (
     publicId?: string,
@@ -16,7 +24,7 @@ export const findOrCreateConversationById = async (
         conversation = await Conversation.findOne({ publicId: targetId }).exec();
     }
 
-    const systemSlug = visitorData?.systemSlug?.trim() || "demo";
+    const systemSlug = normalizePublicChatSystemSlug(visitorData?.systemSlug);
     const name = visitorData?.name?.trim() || "Guest Client";
     const email = visitorData?.email?.trim().toLowerCase();
     const phone = visitorData?.phone?.trim();
@@ -49,6 +57,9 @@ export const findOrCreateConversationById = async (
             },
         });
     } else {
+        // Sessions created by older frontend deployments used the removed
+        // `demo` workspace. Repair them when they are next used.
+        if (conversation.systemSlug === "demo") conversation.systemSlug = defaultPublicChatSystemSlug();
         if (!conversation.visitor) conversation.visitor = { name };
         if (name && name !== "Guest Client") conversation.visitor.name = name;
         if (email) conversation.visitor.email = email;
@@ -73,7 +84,7 @@ export const createConversation = async (input: CreateConversationInput) => {
     const name = (input.user_name ?? input.name ?? "").trim();
     const email = (input.user_email ?? input.email)?.trim().toLowerCase();
     const phone = (input.user_phone ?? input.phone)?.trim();
-    const systemSlug = input.systemSlug?.trim() || "demo";
+    const systemSlug = normalizePublicChatSystemSlug(input.systemSlug);
 
     const conversation = await findOrCreateConversationById(undefined, {
         name,
