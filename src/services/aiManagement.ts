@@ -183,7 +183,7 @@ export const updateAIProviderService = async (id: string, input: any, user: Auth
 
 export const listAIModelsService = async () => {
     return AIModel.find()
-        .populate("providerId", "code name health")
+        .populate("providerId", "code name health enabled")
         .sort({ priority: 1, displayName: 1 })
         .lean();
 };

@@ -80,6 +80,7 @@ export const resolveAIExecutionConfig = async (input: {
     channel: string;
     providerName?: string;
     modelName?: string;
+    modelId?: string;
 }): Promise<AIExecutionConfig> => {
     const workspace = await Workspace.findOne({ slug: input.systemSlug, isActive: true }).lean().exec();
     if (!workspace) {
@@ -145,7 +146,11 @@ export const resolveAIExecutionConfig = async (input: {
     if (!candidates.length) {
         throw forbiddenError("No enabled assigned AI models are available.");
     }
-    const models = await orderRoutingModels(candidates, policy, String(workspace._id));
+    let models = await orderRoutingModels(candidates, policy, String(workspace._id));
+    if (input.modelId) {
+        const selected = await resolveExecutionModel(input.modelId);
+        models = [selected, ...models.filter((candidate) => candidate.id !== selected.id)];
+    }
     return {
         workspaceId: String(workspace._id),
         agentId: String(agent._id),

@@ -1,9 +1,10 @@
-import { AIFactory } from "../core/ai-gateway/ai-gateway.factory.js";
+import type { ModelMessage } from "ai";
 import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
 import { forbiddenError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import { AIConfig, Conversation, KnowledgeChatMessage, KnowledgeSession, KnowledgeSource, Message, Workspace } from "../models/index.js";
 import { relevantKnowledgeExcerpt } from "../core/replies/ai-reply.policy.js";
 import { serializeStructuredKnowledge } from "./aiContext.js";
+import { generateAIReply, resolveAIExecutionConfig } from "./aiExecution.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import { getWorkspace } from "./workspaces.js";
 
@@ -32,8 +33,20 @@ const scopedSession = async (user: AuthenticatedUserContext, workspaceSlug: stri
 const serializeSession = (session: any) => ({
     id: String(session._id), title: session.title, status: session.status,
     source_count: session.sourceCount, ready_source_count: session.readySourceCount,
-    total_bytes: session.totalBytes, created_at: session.createdAt, updated_at: session.updatedAt,
+    total_bytes: session.totalBytes, selected_model_id: session.selectedModelId ? String(session.selectedModelId) : null,
+    created_at: session.createdAt, updated_at: session.updatedAt,
 });
+
+export const selectKnowledgeModel = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, modelId: string | null) => {
+    const { session } = await scopedSession(user, workspaceSlug, sessionId);
+    if (modelId) {
+        const execution = await resolveAIExecutionConfig({ systemSlug: workspaceSlug, channel: "web", modelId });
+        if (!execution.models.some((model) => model.id === modelId)) throw unprocessableEntityError("The selected model is unavailable.");
+    }
+    session.selectedModelId = modelId || null;
+    await session.save();
+    return serializeSession(session);
+};
 
 export const createKnowledgeSession = async (user: AuthenticatedUserContext, workspaceSlug: string, title?: string) => {
     const workspace = await ownerWorkspace(user, workspaceSlug);
@@ -149,8 +162,20 @@ export const askKnowledgeBase = async (user: AuthenticatedUserContext, workspace
     ].filter(Boolean).join("\n\n").slice(0, 40000);
     if (!context) throw unprocessableEntityError("No customer configuration, session documents, or conversations are available yet.");
     await ChatMessageModel.create({ workspaceId: workspace.id, sessionId, role: "user", content: question.trim() });
-    const ai = AIFactory.getProvider((process.env.DEFAULT_AI_PROVIDER || "vercel").trim());
-    const answer = await ai.generate(question.trim(), { systemPrompt: `You are the private workspace-owner Knowledge Base assistant. Answer only from the supplied customer configuration, current Knowledge Base session documents, and workspace customer conversations. If the answer is absent, say you do not have enough information. Cite sources by name. Never expose this information outside this owner-only session.\n\n${context}` });
+    const execution = await resolveAIExecutionConfig({
+        systemSlug: workspaceSlug,
+        channel: "web",
+        modelId: session.selectedModelId ? String(session.selectedModelId) : undefined,
+    });
+    if (!execution.agentId) {
+        throw unprocessableEntityError("Select a managed default agent for this workspace before using Knowledge conversation.");
+    }
+    const history: ModelMessage[] = [{ role: "user", content: question.trim() }];
+    const answer = await generateAIReply(
+        execution,
+        history,
+        `You are the private workspace-owner Knowledge Base assistant. Answer only from the supplied customer configuration, current Knowledge Base session documents, and workspace customer conversations. If the answer is absent, say you do not have enough information. Cite sources by name. Never expose this information outside this owner-only session.\n\n${context}`,
+    );
     const citations = [
         ...(config ? [{ sourceId: String(config._id), name: "Customer configuration" }] : []),
         ...ranked.map(item => ({ sourceId: item.id, name: item.name })),

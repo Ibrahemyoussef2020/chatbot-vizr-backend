@@ -8,6 +8,7 @@ const KnowledgeSessionSchema = new Schema({
     sourceCount: { type: Number, default: 0 },
     readySourceCount: { type: Number, default: 0 },
     totalBytes: { type: Number, default: 0 },
+    selectedModelId: { type: Schema.Types.ObjectId, ref: "AIModel", default: null },
 }, { timestamps: true });
 
 export default model("KnowledgeSession", KnowledgeSessionSchema);

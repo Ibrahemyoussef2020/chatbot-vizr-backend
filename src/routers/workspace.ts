@@ -148,6 +148,7 @@ workspaceRouter.get("/knowledge/outputs/saved", knowledgeBaseController.listSave
 workspaceRouter.get("/knowledge/sessions", knowledgeBaseController.listSessions);
 workspaceRouter.post("/knowledge/sessions", knowledgeBaseController.createSession);
 workspaceRouter.get("/knowledge/sessions/:id", knowledgeBaseController.showSession);
+workspaceRouter.patch("/knowledge/sessions/:id/model", knowledgeBaseController.selectModel);
 workspaceRouter.post(
     "/knowledge/sessions/:id/sources",
     knowledgeUpload.array("files", 10),

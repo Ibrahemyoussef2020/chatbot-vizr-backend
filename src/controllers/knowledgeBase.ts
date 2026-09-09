@@ -5,6 +5,7 @@ import {
     getKnowledgeSession,
     ingestKnowledgeFiles,
     listKnowledgeSessions,
+    selectKnowledgeModel,
 } from "../services/knowledgeBase.js";
 import {
     cancelKnowledgeUpload,
@@ -80,6 +81,16 @@ export const showSession = async (
             parseSlug(req),
             parseId(req),
         );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const selectModel = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const raw = req.body?.model_id;
+        const data = await selectKnowledgeModel(res.locals.user, parseSlug(req), parseId(req), raw ? String(raw) : null);
         res.json({ success: true, data });
     } catch (error) {
         next(error);
