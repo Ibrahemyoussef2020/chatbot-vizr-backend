@@ -210,6 +210,7 @@ export const generateAIReply = async (
             return content;
         } catch (error) {
             lastError = error;
+            console.error(`[AI execution] ${candidate.provider}/${candidate.externalId || "provider-default"} failed:`, error);
             await recordExecution(config, candidate, started, index, usage, error, Boolean(transport));
             if (transport?.isCommitted()) throw error;
             if (error instanceof HttpError && ![403, 429, 502, 503, 504].includes(error.statusCode)) throw error;
