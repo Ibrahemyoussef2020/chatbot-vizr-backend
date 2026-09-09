@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { unprocessableEntityError } from "../core/shared/errors/HttpError.js";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { notFoundError, unauthorizedError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { sendReply } from "./reply.js";
@@ -10,6 +10,26 @@ const defaultPublicChatSystemSlug = () =>
 const normalizePublicChatSystemSlug = (systemSlug?: string) => {
     const value = systemSlug?.trim();
     return !value || value === "demo" ? defaultPublicChatSystemSlug() : value;
+};
+
+const hashSessionToken = (token: string) => createHash("sha256").update(token).digest("hex");
+
+const authorizedConversation = async (publicId?: string, token?: string) => {
+    if (!publicId?.trim()) throw unprocessableEntityError("A thread ID is required.");
+    if (!token?.trim()) throw unauthorizedError("A chat session token is required.");
+    const conversation = await Conversation.findOne({ publicId: publicId.trim() }).select("+sessionTokenHash").exec();
+    if (!conversation) throw notFoundError("Chat session not found.");
+    const expected = conversation.sessionTokenHash;
+    const supplied = hashSessionToken(token.trim());
+    const valid = expected === "permanent_no_session_needed"
+        ? token.trim() === conversation.publicId
+        : expected.length === supplied.length && timingSafeEqual(Buffer.from(expected), Buffer.from(supplied));
+    if (!valid) throw unauthorizedError("Invalid chat session token.");
+    if (expected === "permanent_no_session_needed") {
+        conversation.sessionTokenHash = supplied;
+        await conversation.save();
+    }
+    return conversation;
 };
 
 // Permanent ID lookup helper (never expires, auto-creates if missing by ID)
@@ -86,16 +106,19 @@ export const createConversation = async (input: CreateConversationInput) => {
     const phone = (input.user_phone ?? input.phone)?.trim();
     const systemSlug = normalizePublicChatSystemSlug(input.systemSlug);
 
-    const conversation = await findOrCreateConversationById(undefined, {
-        name,
-        email,
-        phone,
+    const token = randomBytes(32).toString("base64url");
+    const conversation = await Conversation.create({
+        publicId: randomUUID(),
+        sessionTokenHash: hashSessionToken(token),
         systemSlug,
+        receivedFrom: "web",
+        status: "active",
+        visitor: { name: name || "Guest Client", email, phone },
     });
 
     return {
         thread: { id: conversation.publicId, status: conversation.status },
-        sessionToken: conversation.publicId,
+        sessionToken: token,
     };
 };
 
@@ -123,7 +146,7 @@ export const sendMessage = async (input: SendMessageInput) => {
         throw unprocessableEntityError("Message content or attachment is required");
     }
 
-    const conversation = await findOrCreateConversationById(targetId);
+    const conversation = await authorizedConversation(targetId, input.token);
 
     const visitorMessage = await Message.create({
         conversationId: conversation._id,
@@ -159,7 +182,7 @@ export const sendMessage = async (input: SendMessageInput) => {
 };
 
 export const getMessages = async (input: { id: string; token?: string; page?: number; limit?: number }) => {
-    const conversation = await findOrCreateConversationById(input.id);
+    const conversation = await authorizedConversation(input.id, input.token);
     const page = Math.max(1, input.page || 1);
     const limit = Math.min(50, Math.max(1, input.limit || 25));
 
@@ -194,7 +217,7 @@ export const getMessages = async (input: { id: string; token?: string; page?: nu
 };
 
 export const endConversation = async (input: { id: string; token?: string }) => {
-    const conversation = await findOrCreateConversationById(input.id);
+    const conversation = await authorizedConversation(input.id, input.token);
     if (conversation.status !== "ended") {
         conversation.status = "ended";
         conversation.endedAt = new Date();

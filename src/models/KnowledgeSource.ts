@@ -2,7 +2,9 @@ import { Schema, model } from "mongoose";
 
 const KnowledgeSourceSchema = new Schema({
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
-    sessionId: { type: Schema.Types.ObjectId, ref: "KnowledgeSession", required: true, index: true },
+    sessionId: { type: Schema.Types.ObjectId, ref: "KnowledgeSession", index: true },
+    scope: { type: String, enum: ["customer_config", "knowledge_session"], default: "knowledge_session", required: true, index: true },
+    configId: { type: Schema.Types.ObjectId, ref: "AIConfig", index: true },
     name: { type: String, required: true, trim: true },
     mimeType: { type: String, required: true },
     kind: { type: String, enum: ["pdf", "audio", "video", "excel", "text"], required: true, index: true },

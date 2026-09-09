@@ -1,9 +1,14 @@
-import { Workspace, AIConfig } from "../models/index.js";
+import { Workspace, AIConfig, KnowledgeSource } from "../models/index.js";
+import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
+import { notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 
 import { resolveWorkspace } from "./aiManagement.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
+import { getWorkspace } from "./workspaces.js";
+
+const ConfigModel: any = AIConfig;
+const SourceModel: any = KnowledgeSource;
 import { validateStructuredKnowledge } from "./structuredKnowledge.js";
-import { notFoundError } from "../core/shared/errors/HttpError.js";
 
 export const getAIConfigService = async (user: AuthenticatedUserContext, systemSlug?: string) => {
     const ws = await resolveWorkspace(user, systemSlug);
@@ -92,5 +97,65 @@ export const deleteAIConfigService = async (user: AuthenticatedUserContext, conf
     if (!workspace) throw notFoundError("Workspace not found.");
     await resolveWorkspace(user, workspace.slug);
     await config.deleteOne();
+    return true;
+};
+
+const serializeConfigSource = (source: any) => ({
+    id: String(source._id),
+    name: source.name,
+    size: source.size,
+    kind: source.kind,
+    status: source.status,
+    error_message: source.errorMessage || "",
+    created_at: source.createdAt,
+});
+
+export const listAIConfigSourcesService = async (user: AuthenticatedUserContext, systemSlug?: string) => {
+    const workspace = await getWorkspace(user, systemSlug || user.workspaceId || "");
+    const sources = await SourceModel.find({ workspaceId: workspace.id, scope: "customer_config" })
+        .sort({ createdAt: -1 }).lean().exec();
+    return sources.map(serializeConfigSource);
+};
+
+export const uploadAIConfigSourcesService = async (
+    user: AuthenticatedUserContext,
+    systemSlug: string | undefined,
+    files: Express.Multer.File[],
+) => {
+    if (!files.length) throw unprocessableEntityError("Select at least one customer-configuration file.");
+    const workspace = await getWorkspace(user, systemSlug || user.workspaceId || "");
+    let config = await ConfigModel.findOne({ workspaceId: workspace.id }).exec();
+    if (!config) config = await ConfigModel.create({ workspaceId: workspace.id });
+    for (const file of files) {
+        const kind = KnowledgeFileProcessorFactory.kindFor(file);
+        const source = await SourceModel.create({
+            workspaceId: workspace.id,
+            configId: config._id,
+            scope: "customer_config",
+            name: file.originalname,
+            mimeType: file.mimetype || "application/octet-stream",
+            kind,
+            size: file.size,
+            status: "processing",
+        });
+        try {
+            const processed = await KnowledgeFileProcessorFactory.create(file).process(file);
+            source.extractedText = processed.text.trim().slice(0, 2_000_000);
+            source.metadata = processed.metadata || {};
+            if (!source.extractedText) throw unprocessableEntityError(`No readable content was extracted from ${file.originalname}.`);
+            source.status = "ready";
+        } catch (error) {
+            source.status = "failed";
+            source.errorMessage = error instanceof Error ? error.message : "File processing failed.";
+        }
+        await source.save();
+    }
+    return listAIConfigSourcesService(user, systemSlug);
+};
+
+export const deleteAIConfigSourceService = async (user: AuthenticatedUserContext, systemSlug: string | undefined, sourceId: string) => {
+    const workspace = await getWorkspace(user, systemSlug || user.workspaceId || "");
+    const deleted = await SourceModel.findOneAndDelete({ _id: sourceId, workspaceId: workspace.id, scope: "customer_config" });
+    if (!deleted) throw notFoundError("Customer-configuration source not found.");
     return true;
 };

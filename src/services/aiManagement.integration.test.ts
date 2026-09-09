@@ -53,7 +53,6 @@ test("dashboard configuration governs generation and streaming with real persist
         });
 
         await context.test("saved defaults win over client options and fallback reconciles quotas", async child => {
-            child.mock.method(KnowledgeSource, "find", () => { throw new Error("Denied knowledge must not be loaded"); });
             assert.equal(await runAIGateway(user, request), "Managed answer");
             assert.deepEqual(calls, ["primary", "fallback"]);
             const logs = await AIRequestLog.find({ source: "runtime" }).sort({ createdAt: 1 }).lean();

@@ -19,7 +19,7 @@ import {
     channelJobsController,
     aiManagementController,
 } from "../controllers/index.js";
-import { authenticate, requirePermission, validateRequest } from "../middlewares/index.js";
+import { authenticate, requirePermission, requireWorkspaceOwner, validateRequest } from "../middlewares/index.js";
 import { createWorkspaceValidator, updateWorkspaceValidator } from "../validator/index.js";
 
 const workspaceRouter = Router();
@@ -50,12 +50,12 @@ workspaceRouter.get("/threads/time", dashboardAnalyticsController.analytics);
 workspaceRouter.get("/analytics", dashboardAnalyticsController.analytics);
 
 // Thread Management
-workspaceRouter.get("/threads", threadManagementController.threadsList);
-workspaceRouter.get("/threads/:id/messages", threadManagementController.threadMessages);
-workspaceRouter.post("/assign-thread", threadManagementController.assignThread);
-workspaceRouter.post("/reply-thread", threadManagementController.replyThread);
-workspaceRouter.put("/threads/:id", threadManagementController.updateThread);
-workspaceRouter.put("/threads/:id/sidebar", threadManagementController.updateSidebar);
+workspaceRouter.get("/threads", requireWorkspaceOwner, threadManagementController.threadsList);
+workspaceRouter.get("/threads/:id/messages", requireWorkspaceOwner, threadManagementController.threadMessages);
+workspaceRouter.post("/assign-thread", requireWorkspaceOwner, threadManagementController.assignThread);
+workspaceRouter.post("/reply-thread", requireWorkspaceOwner, threadManagementController.replyThread);
+workspaceRouter.put("/threads/:id", requireWorkspaceOwner, threadManagementController.updateThread);
+workspaceRouter.put("/threads/:id/sidebar", requireWorkspaceOwner, threadManagementController.updateSidebar);
 
 // Token Telemetry
 workspaceRouter.get("/analytics/tokens", tokenLogController.analytics);
@@ -81,6 +81,9 @@ workspaceRouter.get("/ai-configs", aiConfigController.getAIConfig);
 workspaceRouter.post("/ai-configs", aiConfigController.saveAIConfig);
 workspaceRouter.put("/ai-configs/:id", aiConfigController.saveAIConfig);
 workspaceRouter.delete("/ai-configs/:id", aiConfigController.deleteAIConfig);
+workspaceRouter.get("/ai-configs/knowledge/sources", aiConfigController.listKnowledgeSources);
+workspaceRouter.post("/ai-configs/knowledge/sources", knowledgeUpload.array("files", 10), aiConfigController.uploadKnowledgeSources);
+workspaceRouter.delete("/ai-configs/knowledge/sources/:id", aiConfigController.deleteKnowledgeSource);
 
 workspaceRouter.get("/ai-management/overview", requirePermission("ai.view"), aiManagementController.overview);
 workspaceRouter.get("/ai-management/runtime", requirePermission("ai.view"), aiManagementController.runtime);
@@ -138,6 +141,8 @@ workspaceRouter.post("/gmail/watch", gmailController.renewWatch);
 workspaceRouter.delete("/gmail/disconnect", gmailController.disconnect);
 workspaceRouter.post("/gmail/test-message", gmailController.testMessage);
 
+// Knowledge Base data, including customer-conversation retrieval, is owner-only.
+workspaceRouter.use("/knowledge", requireWorkspaceOwner);
 // Knowledge Base sessions, sources, and grounded chat
 workspaceRouter.get("/knowledge/outputs/saved", knowledgeBaseController.listSavedOutputs);
 workspaceRouter.get("/knowledge/sessions", knowledgeBaseController.listSessions);

@@ -1,16 +1,29 @@
 import { AIFactory } from "../core/ai-gateway/ai-gateway.factory.js";
 import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
-import { notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
-import { KnowledgeChatMessage, KnowledgeSession, KnowledgeSource } from "../models/index.js";
+import { forbiddenError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
+import { AIConfig, Conversation, KnowledgeChatMessage, KnowledgeSession, KnowledgeSource, Message, Workspace } from "../models/index.js";
+import { relevantKnowledgeExcerpt } from "../core/replies/ai-reply.policy.js";
+import { serializeStructuredKnowledge } from "./aiContext.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import { getWorkspace } from "./workspaces.js";
 
 const SessionModel: any = KnowledgeSession;
 const SourceModel: any = KnowledgeSource;
 const ChatMessageModel: any = KnowledgeChatMessage;
+const ConfigModel: any = AIConfig;
+const ConversationModel: any = Conversation;
+const MessageModel: any = Message;
+const WorkspaceModel: any = Workspace;
+
+const ownerWorkspace = async (user: AuthenticatedUserContext, workspaceSlug: string) => {
+    const workspace = await getWorkspace(user, workspaceSlug);
+    const owned = await WorkspaceModel.exists({ _id: workspace.id, ownerId: user.id });
+    if (!owned) throw forbiddenError("Only the workspace owner can access Knowledge Base data.");
+    return workspace;
+};
 
 const scopedSession = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string) => {
-    const workspace = await getWorkspace(user, workspaceSlug);
+    const workspace = await ownerWorkspace(user, workspaceSlug);
     const session = await SessionModel.findOne({ _id: sessionId, workspaceId: workspace.id }).exec();
     if (!session) throw notFoundError("Knowledge Base session not found.");
     return { workspace, session };
@@ -23,13 +36,13 @@ const serializeSession = (session: any) => ({
 });
 
 export const createKnowledgeSession = async (user: AuthenticatedUserContext, workspaceSlug: string, title?: string) => {
-    const workspace = await getWorkspace(user, workspaceSlug);
+    const workspace = await ownerWorkspace(user, workspaceSlug);
     const session = await SessionModel.create({ workspaceId: workspace.id, createdBy: user.id, title: title?.trim() || "New Knowledge Session" });
     return serializeSession(session);
 };
 
 export const listKnowledgeSessions = async (user: AuthenticatedUserContext, workspaceSlug: string) => {
-    const workspace = await getWorkspace(user, workspaceSlug);
+    const workspace = await ownerWorkspace(user, workspaceSlug);
     return (await SessionModel.find({ workspaceId: workspace.id }).sort({ updatedAt: -1 }).lean().exec()).map(serializeSession);
 };
 
@@ -56,7 +69,7 @@ export const ingestKnowledgeFiles = async (user: AuthenticatedUserContext, works
     session.status = "processing";
     await session.save();
     for (const { file, kind } of filesWithKinds) {
-        const source = await SourceModel.create({ workspaceId: workspace.id, sessionId, name: file.originalname, mimeType: file.mimetype || "application/octet-stream", kind, size: file.size, status: "processing" });
+        const source = await SourceModel.create({ workspaceId: workspace.id, sessionId, scope: "knowledge_session", name: file.originalname, mimeType: file.mimetype || "application/octet-stream", kind, size: file.size, status: "processing" });
         try {
             const processed = await KnowledgeFileProcessorFactory.create(file).process(file);
             source.extractedText = processed.text.trim().slice(0, 2_000_000);
@@ -86,15 +99,62 @@ export const ingestKnowledgeFiles = async (user: AuthenticatedUserContext, works
 export const askKnowledgeBase = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, question: string) => {
     if (!question.trim()) throw unprocessableEntityError("A question is required.");
     const { session, workspace } = await scopedSession(user, workspaceSlug, sessionId);
-    const sources: any[] = await SourceModel.find({ sessionId, status: "ready" }).select("+extractedText").lean().exec();
-    if (!sources.length) throw unprocessableEntityError("Upload and process at least one source before chatting.");
     const terms = question.toLowerCase().split(/\W+/).filter((term) => term.length > 2);
-    const ranked = sources.map((source) => ({ source, score: terms.reduce((score, term) => score + (source.extractedText.toLowerCase().includes(term) ? 1 : 0), 0) })).sort((a, b) => b.score - a.score).slice(0, 5);
-    const context = ranked.map(({ source }, index) => `[Source ${index + 1}: ${source.name}]\n${source.extractedText.slice(0, 8000)}`).join("\n\n");
+    const [config, sources, conversations] = await Promise.all([
+        ConfigModel.findOne({ workspaceId: workspace.id }).lean().exec(),
+        SourceModel.find({
+            workspaceId: workspace.id,
+            status: "ready",
+            // sessionId also matches legacy session sources created before scopes existed.
+            $or: [{ scope: "customer_config" }, { sessionId }],
+        }).select("name scope +extractedText").lean().exec(),
+        ConversationModel.find({ systemSlug: workspaceSlug }).select("_id publicId visitor").sort({ updatedAt: -1 }).limit(100).lean().exec(),
+    ]);
+    const conversationIds = conversations.map((item: any) => item._id);
+    const messages: any[] = conversationIds.length
+        ? await MessageModel.find({ conversationId: { $in: conversationIds } }).select("conversationId content senderType").sort({ createdAt: -1 }).limit(500).lean().exec()
+        : [];
+    const score = (text: string) => terms.reduce((total, term) => total + (text.toLowerCase().includes(term) ? 1 : 0), 0);
+    const documentResults = sources.map((source: any) => ({
+        id: String(source._id),
+        name: source.scope === "customer_config" ? `Customer configuration: ${source.name}` : `Knowledge session: ${source.name}`,
+        text: relevantKnowledgeExcerpt(String(source.extractedText || ""), terms, 5000),
+        score: score(String(source.extractedText || "")),
+    }));
+    const conversationById = new Map(conversations.map((item: any) => [String(item._id), item]));
+    const conversationResults = messages.map((item: any) => {
+        const conversation: any = conversationById.get(String(item.conversationId));
+        return {
+            id: String(item._id),
+            name: `Customer conversation ${conversation?.publicId || "unknown"}`,
+            text: `${item.senderType}: ${item.content}`,
+            score: score(String(item.content || "")),
+        };
+    });
+    const ranked = [...documentResults, ...conversationResults]
+        .filter(item => item.text)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 8);
+    const configContext = config ? [
+        `Company: ${config.company_name}`,
+        `Description: ${config.company_description}`,
+        `Pricing: ${config.pricing_instructions}`,
+        `Contact: ${config.contact_email} ${config.contact_us_link}`,
+        `Actions: ${JSON.stringify(config.actions_data || [])}`,
+        `Structured knowledge: ${serializeStructuredKnowledge(config.structured_knowledge, 12000)}`,
+    ].join("\n") : "";
+    const context = [
+        configContext ? `[Source: Customer configuration]\n${configContext}` : "",
+        ...ranked.map(item => `[Source: ${item.name}]\n${item.text}`),
+    ].filter(Boolean).join("\n\n").slice(0, 40000);
+    if (!context) throw unprocessableEntityError("No customer configuration, session documents, or conversations are available yet.");
     await ChatMessageModel.create({ workspaceId: workspace.id, sessionId, role: "user", content: question.trim() });
     const ai = AIFactory.getProvider((process.env.DEFAULT_AI_PROVIDER || "vercel").trim());
-    const answer = await ai.generate(question.trim(), { systemPrompt: `Answer only from the supplied workspace knowledge. If the answer is absent, say you do not have enough information. Cite sources by name.\n\n${context}` });
-    const citations = ranked.map(({ source }) => ({ sourceId: String(source._id), name: source.name }));
+    const answer = await ai.generate(question.trim(), { systemPrompt: `You are the private workspace-owner Knowledge Base assistant. Answer only from the supplied customer configuration, current Knowledge Base session documents, and workspace customer conversations. If the answer is absent, say you do not have enough information. Cite sources by name. Never expose this information outside this owner-only session.\n\n${context}` });
+    const citations = [
+        ...(config ? [{ sourceId: String(config._id), name: "Customer configuration" }] : []),
+        ...ranked.map(item => ({ sourceId: item.id, name: item.name })),
+    ];
     const message = await ChatMessageModel.create({ workspaceId: workspace.id, sessionId, role: "assistant", content: answer, citations });
     session.set("updatedAt", new Date());
     await session.save();
