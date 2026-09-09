@@ -87,6 +87,22 @@ export const getKnowledgeOutput = async (user: AuthenticatedUserContext, workspa
     return serializeOutput(output, sections);
 };
 
+export const updateKnowledgeOutput = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, kind: string, outputId: string, input: unknown) => {
+    const { output } = await findOutput(user, workspaceSlug, sessionId, kind, outputId);
+    const payload = parseInput(outputInputSchema.pick({ title: true, description: true, category: true }).partial(), input);
+    if (!Object.keys(payload).length) throw unprocessableEntityError("Provide a title, description, or category to update.");
+    output.set(payload);
+    await output.save();
+    return getKnowledgeOutput(user, workspaceSlug, sessionId, kind, outputId);
+};
+
+export const deleteKnowledgeOutput = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, kind: string, outputId: string) => {
+    const { workspace, output } = await findOutput(user, workspaceSlug, sessionId, kind, outputId);
+    await SectionModel.deleteMany({ workspaceId: workspace.id, outputId: output._id }).exec();
+    await output.deleteOne();
+    return { id: outputId, deleted: true };
+};
+
 export const saveKnowledgeOutput = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, kind: string, input: unknown) => {
     const { workspace } = await scope(user, workspaceSlug, sessionId);
     const parsedKind = parseInput(kindSchema, kind);

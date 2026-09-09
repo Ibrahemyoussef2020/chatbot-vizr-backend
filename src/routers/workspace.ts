@@ -148,6 +148,8 @@ workspaceRouter.get("/knowledge/outputs/saved", knowledgeBaseController.listSave
 workspaceRouter.get("/knowledge/sessions", knowledgeBaseController.listSessions);
 workspaceRouter.post("/knowledge/sessions", knowledgeBaseController.createSession);
 workspaceRouter.get("/knowledge/sessions/:id", knowledgeBaseController.showSession);
+workspaceRouter.patch("/knowledge/sessions/:id", knowledgeBaseController.updateSession);
+workspaceRouter.delete("/knowledge/sessions/:id", knowledgeBaseController.removeSession);
 workspaceRouter.patch("/knowledge/sessions/:id/model", knowledgeBaseController.selectModel);
 workspaceRouter.post(
     "/knowledge/sessions/:id/sources",
@@ -164,6 +166,8 @@ workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind", knowledgeBaseContro
 workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind", knowledgeBaseController.saveOutput);
 workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/generate", knowledgeBaseController.generateOutput);
 workspaceRouter.get("/knowledge/sessions/:id/outputs/:kind/:outputId", knowledgeBaseController.showOutput);
+workspaceRouter.patch("/knowledge/sessions/:id/outputs/:kind/:outputId", knowledgeBaseController.updateOutput);
+workspaceRouter.delete("/knowledge/sessions/:id/outputs/:kind/:outputId", knowledgeBaseController.removeOutput);
 workspaceRouter.patch("/knowledge/sessions/:id/outputs/:kind/:outputId/saved", knowledgeBaseController.saveOutputFavorite);
 workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/regenerate", knowledgeBaseController.regenerateOutput);
 workspaceRouter.post("/knowledge/sessions/:id/outputs/:kind/:outputId/share", knowledgeBaseController.shareOutput);

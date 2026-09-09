@@ -1,7 +1,7 @@
 import type { ModelMessage } from "ai";
 import { KnowledgeFileProcessorFactory } from "../core/knowledge/file-processor.factory.js";
 import { forbiddenError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
-import { AIConfig, Conversation, KnowledgeChatMessage, KnowledgeSession, KnowledgeSource, Message, Workspace } from "../models/index.js";
+import { AIConfig, Conversation, KnowledgeChatMessage, KnowledgeOutput, KnowledgeOutputSection, KnowledgeSession, KnowledgeSource, KnowledgeUpload, Message, Workspace } from "../models/index.js";
 import { relevantKnowledgeExcerpt } from "../core/replies/ai-reply.policy.js";
 import { serializeStructuredKnowledge } from "./aiContext.js";
 import { generateAIReply, resolveAIExecutionConfig } from "./aiExecution.js";
@@ -15,6 +15,9 @@ const ConfigModel: any = AIConfig;
 const ConversationModel: any = Conversation;
 const MessageModel: any = Message;
 const WorkspaceModel: any = Workspace;
+const UploadModel: any = KnowledgeUpload;
+const OutputModel: any = KnowledgeOutput;
+const OutputSectionModel: any = KnowledgeOutputSection;
 
 const ownerWorkspace = async (user: AuthenticatedUserContext, workspaceSlug: string) => {
     const workspace = await getWorkspace(user, workspaceSlug);
@@ -57,6 +60,29 @@ export const createKnowledgeSession = async (user: AuthenticatedUserContext, wor
 export const listKnowledgeSessions = async (user: AuthenticatedUserContext, workspaceSlug: string) => {
     const workspace = await ownerWorkspace(user, workspaceSlug);
     return (await SessionModel.find({ workspaceId: workspace.id }).sort({ updatedAt: -1 }).lean().exec()).map(serializeSession);
+};
+
+export const updateKnowledgeSession = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string, title: string) => {
+    const { session } = await scopedSession(user, workspaceSlug, sessionId);
+    const normalized = title.trim();
+    if (!normalized || normalized.length > 160) throw unprocessableEntityError("Session title must be between 1 and 160 characters.");
+    session.title = normalized;
+    await session.save();
+    return serializeSession(session);
+};
+
+export const deleteKnowledgeSession = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string) => {
+    const { workspace, session } = await scopedSession(user, workspaceSlug, sessionId);
+    const outputIds = await OutputModel.find({ workspaceId: workspace.id, sessionId }).distinct("_id").exec();
+    await Promise.all([
+        ChatMessageModel.deleteMany({ workspaceId: workspace.id, sessionId }).exec(),
+        SourceModel.deleteMany({ workspaceId: workspace.id, sessionId }).exec(),
+        UploadModel.deleteMany({ workspaceId: workspace.id, sessionId }).exec(),
+        OutputSectionModel.deleteMany({ workspaceId: workspace.id, outputId: { $in: outputIds } }).exec(),
+        OutputModel.deleteMany({ workspaceId: workspace.id, sessionId }).exec(),
+    ]);
+    await session.deleteOne();
+    return { id: sessionId, deleted: true };
 };
 
 export const getKnowledgeSession = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string) => {

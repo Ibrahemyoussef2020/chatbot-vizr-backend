@@ -6,6 +6,8 @@ import {
     ingestKnowledgeFiles,
     listKnowledgeSessions,
     selectKnowledgeModel,
+    updateKnowledgeSession,
+    deleteKnowledgeSession,
 } from "../services/knowledgeBase.js";
 import {
     cancelKnowledgeUpload,
@@ -19,6 +21,8 @@ import {
     deleteKnowledgeOutputSchema,
     editKnowledgeOutputSchema,
     getKnowledgeOutput,
+    updateKnowledgeOutput,
+    deleteKnowledgeOutput,
     listKnowledgeOutputs,
     listSavedKnowledgeOutputs,
     getKnowledgeOutputSchema,
@@ -95,6 +99,16 @@ export const selectModel = async (req: Request, res: Response, next: NextFunctio
     } catch (error) {
         next(error);
     }
+};
+
+export const updateSession = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await updateKnowledgeSession(res.locals.user, parseSlug(req), parseId(req), String(req.body?.title || "")) }); }
+    catch (error) { next(error); }
+};
+
+export const removeSession = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await deleteKnowledgeSession(res.locals.user, parseSlug(req), parseId(req)) }); }
+    catch (error) { next(error); }
 };
 
 export const uploadSources = async (
@@ -198,6 +212,16 @@ export const listSavedOutputs = async (req: Request, res: Response, next: NextFu
 
 export const showOutput = async (req: Request, res: Response, next: NextFunction) => {
     try { const { sessionId, kind, outputId } = outputArgs(req); res.json({ success: true, data: await getKnowledgeOutput(res.locals.user, parseSlug(req), sessionId, kind, outputId) }); }
+    catch (error) { next(error); }
+};
+
+export const updateOutput = async (req: Request, res: Response, next: NextFunction) => {
+    try { const { sessionId, kind, outputId } = outputArgs(req); res.json({ success: true, data: await updateKnowledgeOutput(res.locals.user, parseSlug(req), sessionId, kind, outputId, req.body) }); }
+    catch (error) { next(error); }
+};
+
+export const removeOutput = async (req: Request, res: Response, next: NextFunction) => {
+    try { const { sessionId, kind, outputId } = outputArgs(req); res.json({ success: true, data: await deleteKnowledgeOutput(res.locals.user, parseSlug(req), sessionId, kind, outputId) }); }
     catch (error) { next(error); }
 };
 
