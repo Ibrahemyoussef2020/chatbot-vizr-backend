@@ -39,6 +39,13 @@ export interface AIExecutionTransport {
     isCommitted: () => boolean;
 }
 
+const currentExternalModelId = (provider: string, externalId: string) => {
+    if (provider === "google" && externalId === "gemini-2.5-flash") {
+        return "gemini-3.6-flash";
+    }
+    return externalId;
+};
+
 export const resolveExecutionModel = async (id: string): Promise<ExecutionModel> => {
     if (!Types.ObjectId.isValid(id)) {
         throw unprocessableEntityError("The agent has an invalid model reference.");
@@ -61,7 +68,7 @@ export const resolveExecutionModel = async (id: string): Promise<ExecutionModel>
         id: String(model._id),
         providerId: String(provider._id),
         provider: provider.code,
-        externalId: model.externalId,
+        externalId: currentExternalModelId(provider.code, model.externalId),
         maxOutputTokens: model.maxOutputTokens,
         priority: model.priority,
         streaming: model.capabilities?.streaming !== false,

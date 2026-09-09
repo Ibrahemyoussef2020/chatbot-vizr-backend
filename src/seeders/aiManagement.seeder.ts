@@ -4,7 +4,7 @@ import { workspacePermissionIds } from "../core/security/permission.registry.js"
 import { providerDefinitions } from "../core/ai-management/provider.registry.js";
 
 const catalogs: Record<string, string[]> = {
-    google: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
+    google: ["gemini-3.6-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
     openrouter: ["openrouter/free", "deepseek/deepseek-r1:free", "qwen/qwen3-coder:free"],
     cohere: ["command-a", "command-r-plus", "command-r7b-12-2024"],
     mistral: ["mistral-small-latest", "mistral-medium-latest", "codestral-latest"],
