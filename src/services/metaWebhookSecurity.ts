@@ -1,10 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { MetaChannelConfig, WhatsAppConfig } from "../models/index.js";
+import { MetaChannelConfig } from "../models/index.js";
+import { resolveWhatsAppPhoneConfig } from "./whatsappRouting.js";
 
 const configuredSecret = async (body: any) => {
     if (body?.object === "whatsapp_business_account") {
         const phoneNumberId = body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
-        const config = phoneNumberId ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: String(phoneNumberId) }).exec() : null;
+        const config = await resolveWhatsAppPhoneConfig(phoneNumberId);
         return config?.whatsapp_app_secret?.trim() || process.env.WHATSAPP_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
     }
     if (body?.object === "instagram") {

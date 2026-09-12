@@ -11,6 +11,10 @@ Contributions are welcome
 
 ## Development seed data
 
+Workspace platform settings inherit the existing shared WhatsApp, Telegram, Gmail, and Instagram accounts when a workspace is created or its channels/inbox are loaded. Existing custom accounts remain unchanged. Workspaces connected to the same physical account share its conversations; each inbound event and automatic reply is processed once. Web conversations remain workspace-specific.
+
+To initialize existing workspaces and replace the legacy global Telegram/Instagram account indexes with workspace-scoped indexes, run `npm run seed:channel-defaults`. This preserves conversations and existing account settings. Disconnecting a workspace from Telegram or Gmail does not disconnect other workspaces using that account.
+
 Run the organized, idempotent development seeders with:
 
 ```bash

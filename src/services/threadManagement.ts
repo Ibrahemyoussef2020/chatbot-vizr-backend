@@ -6,6 +6,7 @@ import type { AuthenticatedUserContext } from "./workspaces.js";
 import "../core/channels/channel.strategies.js";
 import type { ChannelName } from "../core/channels/channel.types.js";
 import { sendReply } from "./reply.js";
+import { ensureWorkspaceChannelDefaults, sharedChannelConversationScopes } from "./channelDefaults.js";
 
 const resolveWorkspaceSlug = async (
     user: AuthenticatedUserContext,
@@ -63,7 +64,10 @@ export const listFilteredThreads = async (
     }];
 
     if (systemSlug && systemSlug !== "all") {
-        query.$or = [{ systemSlug }, { systemSlug: "demo" }];
+        const workspace = await Workspace.findOne({ slug: systemSlug }).lean().exec();
+        if (workspace) await ensureWorkspaceChannelDefaults(workspace._id);
+        const shared = workspace ? await sharedChannelConversationScopes(workspace._id) : [];
+        (query.$and as unknown[]).push({ $or: [{ systemSlug }, { systemSlug: "demo" }, ...shared] });
     }
 
 

@@ -1,4 +1,5 @@
-import { SystemLog, Workspace, WhatsAppConfig } from "../models/index.js";
+import { Conversation, Message, SystemLog, Workspace, WhatsAppConfig } from "../models/index.js";
+import { ensureWorkspaceChannelDefaults } from "./channelDefaults.js";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -10,6 +11,7 @@ const resolveWorkspace = async (slug?: string) => {
 export const getWhatsAppConfigService = async (systemSlug?: string) => {
     const ws = await resolveWorkspace(systemSlug);
     if (!ws) return null;
+    await ensureWorkspaceChannelDefaults(ws._id);
 
     let config = await WhatsAppConfig.findOne({ workspaceId: ws._id }).exec();
     if (!config) {
@@ -19,11 +21,11 @@ export const getWhatsAppConfigService = async (systemSlug?: string) => {
             ai_engine_type: "openai_api",
             internal_server_url: "http://localhost:11434/v1",
             openai_api_key: process.env.OPENAI_API_KEY || "sk-proj-demo-whatsapp-key",
-            whatsapp_app_secret: process.env.WHATSAPP_APP_SECRET || "meta_app_secret_demo",
-            whatsapp_phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || "109876543210985",
-            whatsapp_verify_token: process.env.WHATSAPP_CHANNEL_VERIFY || process.env.WHATSAPP_VERIFY_TOKEN || "vizr_wa_webhook_verify_token_2026",
-            whatsapp_waba_id: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || process.env.WHATSAPP_WABA_ID || "waba_account_998877",
-            whatsapp_access_token: process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN || "EAAXdemo_system_user_token_long_lived",
+            whatsapp_app_secret: "",
+            whatsapp_phone_number_id: "",
+            whatsapp_verify_token: "",
+            whatsapp_waba_id: "",
+            whatsapp_access_token: "",
             openwa_api_url: "http://localhost:8080",
             openwa_api_key: "openwa_key_secret_2026",
             openwa_session_id: "main_session",
@@ -188,9 +190,16 @@ export const getWhatsAppConversationStatusService = async (phone: string, system
         category: "whatsapp-inbound",
         "metadata.phone": cleanPhone,
     }).sort({ createdAt: -1 }).lean().exec();
-    // Do not fall back to another workspace. The same customer phone can talk
-    // to multiple businesses, and unlocking from a foreign inbound event would
-    // send the reply with the wrong Meta credentials.
+    // A customer reply opens the window for the physical phone account, including
+    // other workspaces explicitly connected to that same account.
+    const config = await WhatsAppConfig.findOne({ workspaceId: ws._id }).lean().exec();
+    if (config?.whatsapp_phone_number_id) {
+        const conversations = await Conversation.find({ receivedFrom: "whatsapp", channelAccountId: config.whatsapp_phone_number_id, externalContactId: cleanPhone }).select("_id").lean().exec();
+        const message = await Message.findOne({ conversationId: { $in: conversations.map(conversation => conversation._id) }, senderType: "visitor", receivedFrom: "whatsapp" }).sort({ createdAt: -1 }).lean().exec();
+        if (message && (!latestInbound?.createdAt || message.createdAt > latestInbound.createdAt)) {
+            latestInbound = { createdAt: message.createdAt, metadata: { text: message.content } };
+        }
+    }
     const repliedAt = latestInbound?.createdAt ? new Date(latestInbound.createdAt) : null;
     const windowExpiresAt = repliedAt ? new Date(repliedAt.getTime() + 24 * 60 * 60 * 1000) : null;
     const latestDelivery: any = await SystemLog.findOne({

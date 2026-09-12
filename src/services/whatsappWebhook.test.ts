@@ -10,7 +10,7 @@ const value = (ids: string[]) => ({
 });
 
 test("WhatsApp processes every message across entries and changes, including retries", async context => {
-    context.mock.method(WhatsAppConfig, "findOne", () => query({ workspaceId: "workspace-id" }));
+    context.mock.method(WhatsAppConfig, "find", () => ({ sort: () => ({ limit: () => query([{ workspaceId: "workspace-id" }]) }) }));
     context.mock.method(Workspace, "findById", () => query({ slug: "workspace" }));
     context.mock.method(SystemLog, "exists", () => Promise.resolve(false));
     context.mock.method(SystemLog, "create", () => Promise.resolve({}));
@@ -33,7 +33,7 @@ test("WhatsApp processes every message across entries and changes, including ret
 });
 
 test("unmapped WhatsApp messages fail instead of being silently acknowledged", async context => {
-    context.mock.method(WhatsAppConfig, "findOne", () => query(null));
+    context.mock.method(WhatsAppConfig, "find", () => ({ sort: () => ({ limit: () => query([]) }) }));
     await assert.rejects(handleWhatsAppWebhookEventService({
         object: "whatsapp_business_account",
         entry: [{ changes: [{ value: value(["unmapped"]) }] }],

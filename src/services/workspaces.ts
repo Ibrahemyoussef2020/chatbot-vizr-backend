@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import { forbiddenError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import User, { type UserRole } from "../models/User.js";
 import Workspace from "../models/Workspace.js";
+import { ensureWorkspaceChannelDefaults } from "./channelDefaults.js";
 
 export interface AuthenticatedUserContext {
     id: string;
@@ -38,6 +39,7 @@ export const createInitialWorkspace = async (userId: Types.ObjectId, userName: s
         role: "admin",
         workspaceId: workspace._id,
     });
+    await ensureWorkspaceChannelDefaults(workspace._id);
 
     return workspace;
 };
@@ -107,6 +109,7 @@ export const createWorkspace = async (
         isActive: true,
     });
 
+    await ensureWorkspaceChannelDefaults(workspace._id);
     return serialize(workspace);
 };
 

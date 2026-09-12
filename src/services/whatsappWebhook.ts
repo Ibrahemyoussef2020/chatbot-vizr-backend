@@ -3,6 +3,7 @@ import { SystemLog, WhatsAppConfig, Workspace } from "../models/index.js";
 import { saveInboundChannelMessage } from "./inboundChannel.js";
 import { enqueueChannelReply } from "./channelReplyJobs.js";
 import { z } from "zod";
+import { resolveWhatsAppPhoneConfig } from "./whatsappRouting.js";
 
 const whatsappEnvelopeSchema = z.object({
     object: z.literal("whatsapp_business_account"),
@@ -55,9 +56,7 @@ const handleWhatsAppWebhookValue = async (value: any): Promise<void> => {
             errors: status.errors || [],
         }))));
         const phoneNumberId = value?.metadata?.phone_number_id;
-        const config = phoneNumberId
-            ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: phoneNumberId }).exec()
-            : null;
+        const config = await resolveWhatsAppPhoneConfig(phoneNumberId);
         const workspace = config ? await Workspace.findById(config.workspaceId).exec() : null;
 
         await Promise.all(statuses.map(async (status: any) => {
@@ -93,9 +92,7 @@ const handleWhatsAppWebhookValue = async (value: any): Promise<void> => {
 
     console.log(`[WhatsApp Inbound] Phone: ${fromPhone} | Text: "${textBody}"`);
 
-    const config = phoneNumberId
-        ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: String(phoneNumberId).trim() }).exec()
-        : null;
+    const config = await resolveWhatsAppPhoneConfig(phoneNumberId);
     if (!config) throw new Error("WhatsApp inbound phone number is not mapped to a workspace configuration.");
 
     const workspace = await Workspace.findById(config.workspaceId).exec();

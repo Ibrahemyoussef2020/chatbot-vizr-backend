@@ -5,6 +5,7 @@ import { saveInboundChannelMessage } from "./inboundChannel.js";
 import { sendReply } from "./reply.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import { getWorkspace } from "./workspaces.js";
+import { ensureWorkspaceChannelDefaults } from "./channelDefaults.js";
 import {
     forbiddenError,
     internalServerError,
@@ -159,6 +160,7 @@ export const completeGmailOAuth = async (code: string, state: string) => {
     connection.status = "pending";
     await connection.save();
     await registerGmailWatch(String(connection._id));
+    await Workspace.updateOne({ _id: workspace._id }, { $pull: { disabledChannelDefaults: "gmail" } });
     return { email: connection.email, status: "active" as const };
 };
 
@@ -211,6 +213,7 @@ export const sendGmailTestMessage = async (
     subject: string,
     content: string,
 ) => {
+    await ensureWorkspaceChannelDefaults(workspaceId);
     const connection = await GmailConnection.findOne({ workspaceId } as any)
         .select("+accessToken +refreshToken").exec();
     if (!connection) throw notFoundError("Connect Gmail before sending a test message.");
@@ -292,10 +295,10 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
     if (!(gmailMessage.labelIds || []).includes("INBOX")) return;
     const from = emailFromHeader(header(gmailMessage, "From")).toLowerCase();
     if (!from || from === connection.email.toLowerCase()) return;
+    const linked = await GmailConnection.find({ email: connection.email }).select("_id").lean().exec();
     const trackedConversation: any = await Conversation.findOne({
-        systemSlug: workspace.slug,
         receivedFrom: "gmail",
-        channelAccountId: String(connection._id),
+        channelAccountId: { $in: linked.map(item => String(item._id)) },
         externalContactId: from,
         "channelMetadata.originatedByVizr": true,
         $or: [
@@ -304,6 +307,10 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
         ],
     }).exec();
     if (!trackedConversation) return;
+    connection = await GmailConnection.findById(trackedConversation.channelAccountId).select("+accessToken +refreshToken").exec();
+    if (!connection) return;
+    workspace = await Workspace.findById(connection.workspaceId).exec();
+    if (!workspace) return;
 
     const content = findBody(gmailMessage.payload) || gmailMessage.snippet || "[Email without text body]";
     const saved = await saveInboundChannelMessage({
@@ -348,7 +355,7 @@ export const handleGmailPubSub = async (body: any, verificationToken?: string) =
     if (!encoded) return;
     const notice = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
     const connection = await GmailConnection.findOne({ email: String(notice.emailAddress || "").toLowerCase() })
-        .select("+accessToken +refreshToken").exec();
+        .sort({ createdAt: 1, _id: 1 }).select("+accessToken +refreshToken").exec();
     if (!connection) return;
     const workspace = await Workspace.findById(connection.workspaceId).exec();
     if (!workspace) return;
@@ -400,6 +407,7 @@ export const handleGmailPubSub = async (body: any, verificationToken?: string) =
 };
 
 export const getGmailStatus = async (workspaceId: string) => {
+    await ensureWorkspaceChannelDefaults(workspaceId);
     const connection = await GmailConnection.findOne({ workspaceId }).lean().exec();
     return connection ? {
         connected: connection.status === "active",
@@ -413,7 +421,10 @@ export const getGmailStatus = async (workspaceId: string) => {
 export const disconnectGmail = async (workspaceId: string) => {
     const connection = await GmailConnection.findOne({ workspaceId }).select("+accessToken +refreshToken").exec();
     if (!connection) return;
-    await gmailRequest(connection, "/stop", { method: "POST" }).catch(() => undefined);
+    const anotherWorkspace = await GmailConnection.findOne({ email: connection.email, _id: { $ne: connection._id } }).exec();
+    if (!anotherWorkspace) await gmailRequest(connection, "/stop", { method: "POST" }).catch(() => undefined);
+    await Workspace.updateOne({ _id: workspaceId }, { $addToSet: { disabledChannelDefaults: "gmail" } });
+    if (anotherWorkspace) await Conversation.updateMany({ receivedFrom: "gmail", channelAccountId: String(connection._id) }, { $set: { channelAccountId: String(anotherWorkspace._id) } });
     await connection.deleteOne();
 };
 

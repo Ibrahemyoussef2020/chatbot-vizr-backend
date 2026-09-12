@@ -22,7 +22,7 @@ const TelegramBotSchema = new Schema<ITelegramBot>(
     {
         workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
         bot_token: { type: String, required: true, select: false },
-        telegram_bot_id: { type: String, unique: true, sparse: true, index: true },
+        telegram_bot_id: { type: String, index: true },
         webhook_secret: { type: String, default: "", select: false },
         bot_name: { type: String, default: "Telegram Bot" },
         bot_username: { type: String, default: "vizr_chatbot_bot" },
@@ -37,4 +37,5 @@ const TelegramBotSchema = new Schema<ITelegramBot>(
     { timestamps: true },
 );
 
+TelegramBotSchema.index({ workspaceId: 1, telegram_bot_id: 1 }, { unique: true });
 export default mongoose.model<ITelegramBot>("TelegramBot", TelegramBotSchema);

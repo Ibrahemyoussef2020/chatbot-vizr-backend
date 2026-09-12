@@ -3,6 +3,7 @@ import { Conversation, Message, Workspace, TelegramBot } from "../models/index.j
 import { saveInboundChannelMessage } from "./inboundChannel.js";
 import { enqueueChannelReply } from "./channelReplyJobs.js";
 import { z } from "zod";
+import { ensureWorkspaceChannelDefaults } from "./channelDefaults.js";
 
 const telegramUpdateSchema = z.object({
     update_id: z.number().int(),
@@ -24,6 +25,7 @@ const resolveWorkspace = async (slug?: string) => {
 
 export const listTelegramBotsService = async (systemSlug?: string) => {
     const ws = await resolveWorkspace(systemSlug);
+    if (ws) await ensureWorkspaceChannelDefaults(ws._id);
     const filter = ws ? { workspaceId: ws._id } : {};
     const bots = await TelegramBot.find(filter).populate("workspaceId").exec();
 
@@ -73,7 +75,8 @@ export const createTelegramBotService = async (payload: {
     }
 
     const telegramBotId = String(identity.result.id);
-    if (await TelegramBot.exists({ telegram_bot_id: telegramBotId })) {
+    await Workspace.updateOne({ _id: ws._id }, { $pull: { disabledChannelDefaults: "telegram" } });
+    if (await TelegramBot.exists({ workspaceId: ws._id, telegram_bot_id: telegramBotId })) {
         throw new Error(`@${identity.result.username || telegramBotId} is already connected.`);
     }
 
@@ -113,6 +116,9 @@ export const createTelegramBotService = async (payload: {
 };
 
 const registerTelegramWebhook = async (bot: any) => {
+    const requestedBot = bot;
+    // Telegram accepts one webhook per physical bot. Every workspace uses that endpoint.
+    bot = await TelegramBot.findOne({ telegram_bot_id: bot.telegram_bot_id }).sort({ createdAt: 1, _id: 1 }).select("+bot_token +webhook_secret").exec() || bot;
     const serverUrl = (process.env.SERVER_URL || "https://chatbot-vizr-backend.vercel.app").replace(/\/$/, "");
     if (!serverUrl.startsWith("https://")) throw new Error("SERVER_URL must be a public HTTPS URL for Telegram webhooks.");
     if (!bot.webhook_secret) bot.webhook_secret = randomBytes(24).toString("hex");
@@ -135,6 +141,11 @@ const registerTelegramWebhook = async (bot: any) => {
     bot.error_message = "";
     bot.last_activity_at = new Date();
     await bot.save();
+    if (String(requestedBot._id) !== String(bot._id)) {
+        requestedBot.status = "active";
+        requestedBot.error_message = "";
+        await requestedBot.save();
+    }
     return { success: true, webhook_url: webhookUrl };
 };
 
@@ -195,12 +206,16 @@ export const handleTelegramWebhookService = async (botId: string, update: any, p
 export const deleteTelegramBotService = async (botId: string) => {
     const bot = await TelegramBot.findById(botId).select("+bot_token").exec();
     if (!bot) return true;
-    await fetch(`https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`, {
+    const anotherWorkspace = await TelegramBot.findOne({ telegram_bot_id: bot.telegram_bot_id, _id: { $ne: bot._id } }).select("+bot_token +webhook_secret").exec();
+    if (!anotherWorkspace) await fetch(`https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ drop_pending_updates: false }),
     }).catch(() => undefined);
+    await Workspace.updateOne({ _id: bot.workspaceId }, { $addToSet: { disabledChannelDefaults: "telegram" } });
+    if (anotherWorkspace) await Conversation.updateMany({ receivedFrom: "telegram", channelAccountId: String(bot._id) }, { $set: { channelAccountId: String(anotherWorkspace._id) } });
     await bot.deleteOne();
+    if (anotherWorkspace) await registerTelegramWebhook(anotherWorkspace);
     return true;
 };
 
