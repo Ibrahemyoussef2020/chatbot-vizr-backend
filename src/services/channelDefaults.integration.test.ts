@@ -7,8 +7,9 @@ import { Conversation, GmailConnection, Message, TelegramBot, WhatsAppConfig, Wo
 import { ensureWorkspaceChannelDefaults } from "./channelDefaults.js";
 import { listFilteredThreads } from "./threadManagement.js";
 import { getWhatsAppConversationStatusService } from "./whatsappConfig.js";
+import { processGmailMessage } from "./gmail.js";
 
-test("workspace defaults share platform inboxes and preserve account overrides", { timeout: 120000 }, async () => {
+test("workspace defaults share platform inboxes and preserve account overrides", { timeout: 120000 }, async context => {
     const server = await MongoMemoryServer.create({ binary: { downloadDir: resolve("node_modules/.cache/mongodb-memory-server") } });
     try {
         await mongoose.connect(server.getUri());
@@ -44,6 +45,18 @@ test("workspace defaults share platform inboxes and preserve account overrides",
         assert.equal((await getWhatsAppConversationStatusService("201000000000", custom.slug)).replied, false);
         const search = await listFilteredThreads(user, { systemSlug: target.slug, search: "Private" });
         assert.equal(search.total, 0);
+        gmail.accessToken = "test-access";
+        gmail.tokenExpiresAt = new Date(Date.now() + 3600000);
+        context.mock.method(globalThis, "fetch", async () => Response.json({
+            id: "new-email", threadId: "new-thread", labelIds: ["INBOX"],
+            payload: { mimeType: "text/plain", headers: [{ name: "From", value: "new-customer@example.test" }], body: { data: Buffer.from("New incoming email").toString("base64url") } },
+        }));
+        await processGmailMessage(gmail, source, "new-email");
+        for (const slug of [source.slug, target.slug, custom.slug]) {
+            const inbox = await listFilteredThreads(user, { systemSlug: slug, channel: "gmail" });
+            assert.equal(inbox.total, 2);
+        }
+        assert.equal(await Message.countDocuments({ externalMessageId: "new-email" }), 1);
         await Workspace.updateOne({ _id: target._id }, { $addToSet: { disabledChannelDefaults: "gmail" } });
         await GmailConnection.deleteOne({ workspaceId: target._id });
         await ensureWorkspaceChannelDefaults(target._id);

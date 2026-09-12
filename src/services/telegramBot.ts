@@ -165,7 +165,7 @@ export const handleTelegramWebhookService = async (botId: string, update: any, p
 
     update = telegramUpdateSchema.parse(update);
     const incoming = update.message;
-    const text = incoming?.text || incoming?.caption;
+    const text = incoming?.text || incoming?.caption || (incoming ? "[Telegram attachment or service message]" : undefined);
     if (!incoming?.message_id || !incoming?.chat?.id || !text) return;
 
     const workspace: any = bot.workspaceId;

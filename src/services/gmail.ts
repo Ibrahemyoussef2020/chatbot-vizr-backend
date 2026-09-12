@@ -290,7 +290,7 @@ export const sendGmailTestMessage = async (
     };
 };
 
-const processGmailMessage = async (connection: any, workspace: any, messageId: string) => {
+export const processGmailMessage = async (connection: any, workspace: any, messageId: string) => {
     const gmailMessage = await gmailRequest(connection, `/messages/${encodeURIComponent(messageId)}?format=full`);
     if (!(gmailMessage.labelIds || []).includes("INBOX")) return;
     const from = emailFromHeader(header(gmailMessage, "From")).toLowerCase();
@@ -306,11 +306,12 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
             { "channelMetadata.threadIds": gmailMessage.threadId },
         ],
     }).exec();
-    if (!trackedConversation) return;
-    connection = await GmailConnection.findById(trackedConversation.channelAccountId).select("+accessToken +refreshToken").exec();
-    if (!connection) return;
-    workspace = await Workspace.findById(connection.workspaceId).exec();
-    if (!workspace) return;
+    if (trackedConversation) {
+        connection = await GmailConnection.findById(trackedConversation.channelAccountId).select("+accessToken +refreshToken").exec();
+        if (!connection) return;
+        workspace = await Workspace.findById(connection.workspaceId).exec();
+        if (!workspace) return;
+    }
 
     const content = findBody(gmailMessage.payload) || gmailMessage.snippet || "[Email without text body]";
     const saved = await saveInboundChannelMessage({
@@ -325,7 +326,7 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
     if (saved.duplicate || !saved.conversation) return;
     const existingMetadata = saved.conversation.get("channelMetadata") || {};
     saved.conversation.set("channelMetadata", {
-        originatedByVizr: true,
+        originatedByVizr: Boolean(existingMetadata.originatedByVizr || trackedConversation),
         subject: header(gmailMessage, "Subject"),
         messageId: header(gmailMessage, "Message-ID"),
         references: header(gmailMessage, "References"),
@@ -333,6 +334,7 @@ const processGmailMessage = async (connection: any, workspace: any, messageId: s
         threadIds: existingMetadata.threadIds || [gmailMessage.threadId],
     });
     await saved.conversation.save();
+    if (!trackedConversation) return;
     await sendReply({
         type: "ai",
         conversationId: String(saved.conversation._id),
@@ -366,13 +368,18 @@ export const handleGmailPubSub = async (body: any, verificationToken?: string) =
         return;
     }
     try {
-        const history = await gmailRequest(connection, `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelId=INBOX`);
+        let history: any;
+        let pageToken = "";
         const ids = new Set<string>();
-        for (const record of history.history || []) {
-            for (const added of record.messagesAdded || []) {
-                if (added.message?.id) ids.add(added.message.id);
+        do {
+            history = await gmailRequest(connection, `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelId=INBOX${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`);
+            for (const record of history.history || []) {
+                for (const added of record.messagesAdded || []) {
+                    if (added.message?.id) ids.add(added.message.id);
+                }
             }
-        }
+            pageToken = String(history.nextPageToken || "");
+        } while (pageToken);
 
         const failures: string[] = [];
         for (const id of ids) {
@@ -394,10 +401,11 @@ export const handleGmailPubSub = async (body: any, verificationToken?: string) =
             }
         }
 
-        connection.historyId = String(history.historyId || notice.historyId || connection.historyId);
+        if (!failures.length) connection.historyId = String(history.historyId || notice.historyId || connection.historyId);
         connection.status = failures.length ? "error" : "active";
         connection.errorMessage = failures[0] || "";
         await connection.save();
+        if (failures.length) throw internalServerError("Gmail messages could not all be processed; retry the notification.");
     } catch (error: any) {
         connection.status = "error";
         connection.errorMessage = error.message || "Unable to process Gmail notification.";

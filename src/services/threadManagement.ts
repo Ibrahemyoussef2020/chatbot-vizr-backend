@@ -56,12 +56,7 @@ export const listFilteredThreads = async (
     const systemSlug = await resolveWorkspaceSlug(user, input.systemSlug);
     const query: Record<string, unknown> = {};
 
-    query.$and = [{
-        $or: [
-            { receivedFrom: { $ne: "gmail" } },
-            { "channelMetadata.originatedByVizr": true },
-        ],
-    }];
+    query.$and = [];
 
     if (systemSlug && systemSlug !== "all") {
         const workspace = await Workspace.findOne({ slug: systemSlug }).lean().exec();
@@ -101,6 +96,7 @@ export const listFilteredThreads = async (
             { "visitor.phone": searchRegex },
         ];
     }
+    if (!(query.$and as unknown[]).length) delete query.$and;
 
     const page = Math.max(input.page || 1, 1);
     const limit = Math.max(input.limit || 15, 1);
