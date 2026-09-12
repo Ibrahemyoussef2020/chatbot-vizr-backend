@@ -37,9 +37,14 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
     if (body?.object !== "whatsapp_business_account") return;
     body = whatsappEnvelopeSchema.parse(body);
 
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
+    for (const entry of body.entry) {
+        for (const change of entry.changes) {
+            await handleWhatsAppWebhookValue(change.value);
+        }
+    }
+};
+
+const handleWhatsAppWebhookValue = async (value: any): Promise<void> => {
     const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
 
     if (statuses.length) {
@@ -75,9 +80,8 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
         }));
     }
 
-    const message = value?.messages?.[0];
-
-    if (!message) return;
+    const messages = Array.isArray(value?.messages) ? value.messages : [];
+    for (const message of messages) {
 
     const fromPhone = message.from;
     const textBody = message.text?.body
@@ -92,12 +96,12 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
     const config = phoneNumberId
         ? await WhatsAppConfig.findOne({ whatsapp_phone_number_id: String(phoneNumberId).trim() }).exec()
         : null;
-    if (!config) return;
+    if (!config) throw new Error("WhatsApp inbound phone number is not mapped to a workspace configuration.");
 
     const workspace = await Workspace.findById(config.workspaceId).exec();
-    if (!workspace) return;
+    if (!workspace) throw new Error("WhatsApp inbound workspace was not found.");
     const alreadyRecorded = await SystemLog.exists({ category: "whatsapp-inbound", "metadata.messageId": message.id });
-    if (alreadyRecorded) return;
+    if (alreadyRecorded) continue;
     const profileName = value?.contacts?.[0]?.profile?.name || `WhatsApp ${fromPhone}`;
     const saved = await saveInboundChannelMessage({
         systemSlug: workspace.slug,
@@ -127,4 +131,5 @@ export const handleWhatsAppWebhookEventService = async (body: any): Promise<void
         message: `WhatsApp reply received from ${fromPhone}`,
         metadata: { phone: fromPhone, text: textBody, messageId: message.id, type: message.type },
     });
+    }
 };
