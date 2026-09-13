@@ -11,7 +11,7 @@ import type {
     ProviderDescriptor,
 } from "../payment.types.js";
 
-const EGYPTIAN_WALLET = /^(?:\+?20)?1[0125]\d{8}$/;
+const EGYPTIAN_WALLET = /^(?:\+?20|0)?1[0125]\d{8}$/;
 
 const setting = (config: GatewayConfig, key: string): unknown => config.settings?.[key];
 

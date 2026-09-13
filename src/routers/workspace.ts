@@ -1,4 +1,8 @@
 import { Router } from "express";
+import * as businessPlans from "../controllers/businessPlans.js";
+import * as businessPayments from "../controllers/businessPayments.js";
+import * as businessPaymentMethods from "../controllers/businessPaymentMethods.js";
+import * as businessSubscriptions from "../controllers/businessSubscriptions.js";
 import multer from "multer";
 import {
     workspaceController,
@@ -32,6 +36,15 @@ const knowledgeUpload = multer({
 });
 
 workspaceRouter.use(authenticate);
+workspaceRouter.get("/subscriptions", requirePermission("subscriptions.view"), businessSubscriptions.index);
+workspaceRouter.get("/payment-methods", requirePermission("payment_methods.manage"), businessPaymentMethods.index);
+workspaceRouter.put("/payment-methods/:provider", requirePermission("payment_methods.manage"), businessPaymentMethods.update);
+workspaceRouter.get("/payments", requirePermission("payments.view"), businessPayments.index);
+workspaceRouter.get("/payments/:id", requirePermission("payments.view"), businessPayments.show);
+workspaceRouter.get("/pricings", requirePermission("plans.manage"), businessPlans.index);
+workspaceRouter.post("/pricings", requirePermission("plans.manage"), businessPlans.create);
+workspaceRouter.put("/pricings/:id", requirePermission("plans.manage"), businessPlans.update);
+workspaceRouter.delete("/pricings/:id", requirePermission("plans.manage"), businessPlans.remove);
 workspaceRouter.get("/channel-jobs/failed", channelJobsController.failed);
 workspaceRouter.post("/channel-jobs/:id/retry", channelJobsController.retry);
 

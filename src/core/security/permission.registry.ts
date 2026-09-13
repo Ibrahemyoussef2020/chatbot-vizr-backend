@@ -16,7 +16,10 @@ const permission = (
 
 export const permissionRegistry: PermissionDefinition[] = [
     permission("business.manage", "Manage Vizr Business", "Business", "Manage the Vizr SaaS business and global configuration.", "business"),
-    permission("plans.manage", "Manage Plans", "Business", "Create, price, publish, pause, and retire subscription plans.", "business"),
+    permission("plans.manage", "Control Plans", "Business", "Create, view, edit, price, publish, archive, and delete subscription plans.", "business"),
+    permission("payments.view", "View Business Payments", "Business", "View the business payment ledger and transaction details.", "business"),
+    permission("payment_methods.manage", "Manage Payment Methods", "Business", "Configure business payment providers and availability.", "business"),
+    permission("subscriptions.view", "View Business Subscriptions", "Business", "View subscriber plans, billing periods and lifecycle status.", "business"),
     permission("workspaces.create", "Create Workspaces", "Business", "Provision client and business-owned workspaces.", "business"),
     permission("workspaces.view_all", "View All Workspaces", "Business", "View business-owned and client workspace records.", "business"),
     permission("workspaces.manage_owned", "Manage Owned Workspaces", "Business", "Manage only workspaces owned by the business account.", "business"),

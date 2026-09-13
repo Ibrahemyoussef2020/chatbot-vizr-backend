@@ -3,6 +3,7 @@ import { passwordUtils } from "../../lib/index.js";
 import User from "../../models/User.js";
 import createToken, { UserTokenPayload } from "../../utils/createToken.js";
 import { ensureUserWorkspace } from "../workspaces.js";
+import getSessionService from "./session.js";
 
 export interface UserLoginInput {
     email: string;
@@ -13,6 +14,7 @@ export interface LoginResult {
     userInfo: UserTokenPayload & {
         role: string;
         workspaceId?: unknown;
+        permissions?: string[];
     };
     accessToken?: string;
     refreshToken?: string;
@@ -44,12 +46,14 @@ const loginService = async ({ email, password }: UserLoginInput): Promise<LoginR
     const token = createToken(tokenPayload);
 
     const { accessToken, refreshToken } = token;
+    const session = await getSessionService({ accessToken });
 
     return {
         userInfo: {
             ...tokenPayload,
             role: foundUser.role,
             workspaceId,
+            permissions: session?.userInfo.permissions || [],
         },
         accessToken,
         refreshToken,
