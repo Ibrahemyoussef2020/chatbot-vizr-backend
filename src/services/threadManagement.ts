@@ -1,7 +1,7 @@
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import Workspace from "../models/Workspace.js";
-import { forbiddenError, notFoundError } from "../core/shared/errors/HttpError.js";
+import { forbiddenError, notFoundError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
 import "../core/channels/channel.strategies.js";
 import type { ChannelName } from "../core/channels/channel.types.js";
@@ -312,7 +312,17 @@ export const replyToThreadService = async (
     content: string,
     senderName: string = "Support Agent",
 ) => {
-    const conversation = await Conversation.findOne({ publicId: threadId }).exec();
+    if (typeof threadId !== "string" || !threadId.trim()) {
+        throw unprocessableEntityError("A thread ID is required.");
+    }
+    if (typeof content !== "string" || !content.trim()) {
+        throw unprocessableEntityError("Reply content is required.");
+    }
+    const cleanContent = content.trim();
+    if (cleanContent.length > 4000) {
+        throw unprocessableEntityError("Replies must be 4,000 characters or fewer.");
+    }
+    const conversation = await Conversation.findOne({ publicId: threadId.trim() }).exec();
     if (!conversation) throw notFoundError("Thread not found");
 
     const receivedFrom = (conversation.receivedFrom || "web") as ChannelName;
@@ -321,7 +331,7 @@ export const replyToThreadService = async (
         conversationId: String(conversation._id),
         systemSlug: conversation.systemSlug,
         channel: receivedFrom,
-        content,
+        content: cleanContent,
         recipientId: conversation.externalContactId || conversation.visitor?.phone || "",
         channelAccountId: conversation.channelAccountId || undefined,
         senderName,

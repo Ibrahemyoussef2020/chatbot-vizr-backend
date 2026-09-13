@@ -23,7 +23,7 @@ export interface ISubscription extends Document {
 
 const SubscriptionSchema = new Schema<ISubscription>(
     {
-        workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
+        workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
         planId: { type: Schema.Types.ObjectId, ref: "Plan", required: true, index: true },
         planCode: { type: String, required: true, trim: true, lowercase: true },
         status: {
@@ -48,7 +48,11 @@ const SubscriptionSchema = new Schema<ISubscription>(
 // A workspace may only hold one live subscription at a time.
 SubscriptionSchema.index(
     { workspaceId: 1 },
-    { unique: true, partialFilterExpression: { status: { $in: ["trialing", "active", "past_due"] } } },
+    {
+        name: "workspace_live_subscription",
+        unique: true,
+        partialFilterExpression: { status: { $in: ["trialing", "active", "past_due"] } },
+    },
 );
 
 export default mongoose.model<ISubscription>("Subscription", SubscriptionSchema);

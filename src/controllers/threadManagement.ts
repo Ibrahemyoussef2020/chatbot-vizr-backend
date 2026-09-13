@@ -108,9 +108,9 @@ export const replyThread = async (
     next: NextFunction,
 ) => {
     try {
-        const threadId = req.body.threadId || req.body.thread_id;
-        const content = req.body.content;
-        const senderName = req.body.senderName || req.body.sender_name || "Support Agent";
+        const threadId = req.body?.threadId || req.body?.thread_id;
+        const content = req.body?.content;
+        const senderName = req.body?.senderName || req.body?.sender_name || "Support Agent";
 
         const message = await replyToThreadService(threadId, content, senderName);
         res.status(200).json({

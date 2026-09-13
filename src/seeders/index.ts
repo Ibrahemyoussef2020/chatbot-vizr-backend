@@ -10,6 +10,7 @@ import { seedTags } from "./tag.seeder.js";
 import { seedSystemLogs } from "./systemLog.seeder.js";
 import { seedKnowledgeOutputs } from "./knowledgeOutput.seeder.js";
 import { seedAIManagement } from "./aiManagement.seeder.js";
+import { seedPaymentAdministration } from "./paymentAdministration.seeder.js";
 
 const runSeeders = async () => {
     await connectDB();
@@ -31,6 +32,12 @@ const runSeeders = async () => {
         if (owner && workspace) await assignUserWorkspace(owner._id, workspace._id);
     }
     await seedAgentUser(firstBusinessWorkspace._id);
+
+    console.log("Seeding pricing, payment methods, sample payments and historical subscriptions...");
+    const paymentResult = await seedPaymentAdministration(
+        seedConfig.workspaces.filter(workspace => workspace.ownership === "business").map(workspace => workspace.slug),
+    );
+    console.log(JSON.stringify(paymentResult));
 
     console.log("Seeding Brand and Vizr knowledge sessions, plans, and reports...");
     const knowledgeResult = await seedKnowledgeOutputs(workspaces);
