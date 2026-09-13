@@ -1,5 +1,7 @@
 import { Conversation, Message, SystemLog, Workspace, WhatsAppConfig } from "../models/index.js";
 import { ensureWorkspaceChannelDefaults } from "./channelDefaults.js";
+import { syncWhatsAppAccessToken } from "./whatsappCredentials.js";
+import { unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 
 const resolveWorkspace = async (slug?: string) => {
     if (!slug) {
@@ -81,6 +83,9 @@ export const saveWhatsAppConfigService = async (systemSlug?: string, payload?: a
     if (payload?.openwa_session_id !== undefined) config.openwa_session_id = payload.openwa_session_id;
 
     await config.save();
+    if (config.provider === "meta" && payload?.whatsapp_access_token !== undefined) {
+        await syncWhatsAppAccessToken(config.whatsapp_phone_number_id, config.whatsapp_access_token);
+    }
     return getWhatsAppConfigService(ws.slug);
 };
 
@@ -298,6 +303,9 @@ export const sendWhatsAppTestMessageService = async (
                 error?.error_subcode != null ? `subcode ${error.error_subcode}` : "",
                 error?.fbtrace_id ? `trace ${error.fbtrace_id}` : "",
             ].filter(Boolean).join(", ");
+            if (error?.code === 190) {
+                throw unprocessableEntityError("WhatsApp access token was rejected by Meta (code 190). Save a valid token in WhatsApp channel settings for this phone number.");
+            }
             throw new Error(`Meta Cloud API Error${identifiers ? ` (${identifiers})` : ""}: ${metaErr}`);
         }
 
