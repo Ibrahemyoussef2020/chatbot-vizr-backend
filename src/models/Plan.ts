@@ -22,6 +22,7 @@ export interface IPlan extends Document {
     ctaLabel?: string;
     ctaPath?: string;
     features: string[];
+    featureIds: mongoose.Types.ObjectId[];
     quotas: Map<string, number>;
     entitlements: Map<string, boolean>;
     overagePolicy: OveragePolicy;
@@ -49,6 +50,7 @@ const PlanSchema = new Schema<IPlan>(
         ctaLabel: { type: String, default: "", trim: true, maxlength: 120 },
         ctaPath: { type: String, default: "", trim: true, maxlength: 255 },
         features: { type: [String], default: [] },
+        featureIds: { type: [Schema.Types.ObjectId], ref: "PlanFeature", default: [] },
         quotas: { type: Map, of: Number, default: () => new Map<string, number>() },
         entitlements: { type: Map, of: Boolean, default: () => new Map<string, boolean>() },
         overagePolicy: { type: String, enum: ["block", "throttle", "allow"], default: "block" },

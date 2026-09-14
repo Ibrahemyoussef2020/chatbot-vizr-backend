@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { z } from "zod";
 import Plan from "../models/Plan.js";
+import PlanFeature from "../models/PlanFeature.js";
 import Subscription from "../models/Subscription.js";
 import PaymentTransaction from "../models/PaymentTransaction.js";
 import type { AuthenticatedUserContext } from "./workspaces.js";
@@ -19,6 +20,7 @@ export const planInputSchema = z.object({
     trialDays: z.number().int().min(0).max(365).default(0),
     sortOrder: z.number().int().min(0).default(0),
     features: z.array(z.string().trim().min(1).max(250)).max(50).default([]),
+    featureIds: z.array(z.string().refine(value => Types.ObjectId.isValid(value), "Invalid feature ID")).max(50).optional(),
 }).strict();
 
 const authorize = (user: AuthenticatedUserContext) => {
@@ -52,7 +54,14 @@ export const saveBusinessPlan = async (user: AuthenticatedUserContext, input: un
     )) {
         throw conflictError("A plan referenced by subscriptions or payments cannot change its code.");
     }
-    plan.set(parsed.data);
+    if (parsed.data.featureIds !== undefined) {
+        const ids = [...new Set(parsed.data.featureIds)];
+        const selected = await PlanFeature.find({ _id: { $in: ids } }).lean();
+        if (selected.length !== ids.length) throw unprocessableEntityError("Select existing features only.");
+        plan.set({ ...parsed.data, featureIds: ids, features: ids.map(id => selected.find(feature => String(feature._id) === id)!.name) });
+    } else {
+        plan.set(parsed.data);
+    }
     try {
         await plan.save();
     } catch (error) {

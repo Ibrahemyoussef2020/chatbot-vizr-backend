@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as businessPlans from "../controllers/businessPlans.js";
+import * as businessFeatures from "../controllers/businessFeatures.js";
 import * as businessPayments from "../controllers/businessPayments.js";
 import * as businessPaymentMethods from "../controllers/businessPaymentMethods.js";
 import * as businessSubscriptions from "../controllers/businessSubscriptions.js";
@@ -36,6 +37,16 @@ const knowledgeUpload = multer({
 });
 
 workspaceRouter.use(authenticate);
+workspaceRouter.get("/pricings-features/options", requirePermission("plans.manage"), businessFeatures.options);
+workspaceRouter.get("/pricings-features", requirePermission("plans.manage"), businessFeatures.index);
+workspaceRouter.post("/pricings-features", requirePermission("plans.manage"), businessFeatures.create);
+workspaceRouter.put("/pricings-features/:id", requirePermission("plans.manage"), businessFeatures.update);
+workspaceRouter.delete("/pricings-features/:id", requirePermission("plans.manage"), businessFeatures.remove);
+workspaceRouter.get("/features/options", requirePermission("plans.manage"), businessFeatures.options);
+workspaceRouter.get("/features", requirePermission("plans.manage"), businessFeatures.index);
+workspaceRouter.post("/features", requirePermission("plans.manage"), businessFeatures.create);
+workspaceRouter.put("/features/:id", requirePermission("plans.manage"), businessFeatures.update);
+workspaceRouter.delete("/features/:id", requirePermission("plans.manage"), businessFeatures.remove);
 workspaceRouter.get("/subscriptions", requirePermission("subscriptions.view"), businessSubscriptions.index);
 workspaceRouter.get("/payment-methods", requirePermission("payment_methods.manage"), businessPaymentMethods.index);
 workspaceRouter.put("/payment-methods/:provider", requirePermission("payment_methods.manage"), businessPaymentMethods.update);
