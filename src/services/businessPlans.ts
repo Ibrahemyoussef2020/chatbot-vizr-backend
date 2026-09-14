@@ -20,7 +20,7 @@ export const planInputSchema = z.object({
     trialDays: z.number().int().min(0).max(365).default(0),
     sortOrder: z.number().int().min(0).default(0),
     features: z.array(z.string().trim().min(1).max(250)).max(50).default([]),
-    featureIds: z.array(z.string().refine(value => Types.ObjectId.isValid(value), "Invalid feature ID")).max(50).optional(),
+    featureIds: z.array(z.string().refine(value => Types.ObjectId.isValid(value), "Invalid feature ID")).max(1, "A pricing plan can select only one feature bundle.").optional(),
 }).strict();
 
 const authorize = (user: AuthenticatedUserContext) => {

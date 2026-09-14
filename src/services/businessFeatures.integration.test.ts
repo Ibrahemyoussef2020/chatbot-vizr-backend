@@ -55,6 +55,7 @@ test("feature catalog validates quotas, agent references, permissions and plan r
         await assert.rejects(() => saveBusinessFeature(owner, input), { statusCode: 409 });
         const planInput = { code: "starter", name: "Starter", currency: "USD", pricing: { monthly: 10, yearly: 100 }, status: "draft", visibility: "public", featureIds: [id] };
         await assert.rejects(() => saveBusinessPlan(owner, { ...planInput, featureIds: [owner.id] }), { statusCode: 422 });
+        await assert.rejects(() => saveBusinessPlan(owner, { ...planInput, featureIds: [id, id] }), { statusCode: 422 });
         const plan = await saveBusinessPlan(owner, planInput);
         assert.deepEqual(plan.features, ["Assistant"]);
         await assert.rejects(() => deleteBusinessFeature(owner, id), { statusCode: 409 });
