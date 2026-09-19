@@ -1,5 +1,5 @@
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import * as features from "../services/businessFeatures.js";
+import * as features from "../services/plans/businessFeatures.js";
 
 export const index = asyncHandler(async (_req, res) => {
     res.json({ success: true, data: await features.listBusinessFeatures(res.locals.user) });

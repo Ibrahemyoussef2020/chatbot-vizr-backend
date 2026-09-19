@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { forbiddenError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 import { verifyCloudinaryNotification, type CloudinaryAsset } from "../lib/cloudinary.js";
-import { completeKnowledgeUploadFromWebhook } from "../services/knowledgeUpload.js";
+import { completeKnowledgeUploadFromWebhook } from "../services/knowledge/knowledgeUpload.js";
 
 export const handleCloudinaryWebhook = async (req: Request, res: Response, next: NextFunction) => {
     try {

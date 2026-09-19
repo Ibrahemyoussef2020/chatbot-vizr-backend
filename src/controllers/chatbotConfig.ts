@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getChatbotConfigService, updateChatbotConfigService } from "../services/chatbotConfig.js";
+import { getChatbotConfigService, updateChatbotConfigService } from "../services/integrations/chatbotConfig.js";
 
 const parseSlug = (req: Request): string | undefined => {
     const slug = req.query.system_slug || req.query.system || req.body?.system_slug;

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import { listBusinessPlans, saveBusinessPlan, deleteBusinessPlan } from "../services/businessPlans.js";
+import { listBusinessPlans, saveBusinessPlan, deleteBusinessPlan } from "../services/plans/businessPlans.js";
 
 const readPlans = async (_req: Request, res: Response) => {
     const data = await listBusinessPlans(res.locals.user);

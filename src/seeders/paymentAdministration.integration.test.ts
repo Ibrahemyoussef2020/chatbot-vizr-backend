@@ -9,10 +9,10 @@ import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { Plan, PaymentMethodConfig, PaymentTransaction, Subscription, Workspace } from "../models/index.js";
 import { seedPaymentAdministration } from "./paymentAdministration.seeder.js";
-import { listBusinessPlans } from "../services/businessPlans.js";
-import { listBusinessPayments } from "../services/businessPayments.js";
-import { listBusinessPaymentMethods } from "../services/businessPaymentMethods.js";
-import { listBusinessSubscriptions } from "../services/businessSubscriptions.js";
+import { listBusinessPlans } from "../services/plans/businessPlans.js";
+import { listBusinessPayments } from "../services/payments/businessPayments.js";
+import { listBusinessPaymentMethods } from "../services/payments/businessPaymentMethods.js";
+import { listBusinessSubscriptions } from "../services/payments/businessSubscriptions.js";
 
 test("payment seed populates four APIs, preserves existing records and is idempotent", { timeout: 120000 }, async () => {
     const server = await MongoMemoryServer.create({ binary: { downloadDir: resolve("node_modules/.cache/mongodb-memory-server") } });

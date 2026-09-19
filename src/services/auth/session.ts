@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { unauthorizedError } from "../../core/shared/errors/HttpError.js";
 import User from "../../models/User.js";
 import type { UserTokenPayload } from "../../utils/createToken.js";
-import { ensureUserWorkspace } from "../workspaces.js";
+import { ensureUserWorkspace } from "../workspaces/workspaces.js";
 import SecurityRole from "../../models/SecurityRole.js";
 import { businessPermissionIds, workspacePermissionIds } from "../../core/security/permission.registry.js";
 

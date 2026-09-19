@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import { getTokenAnalytics, getTokenLogsForApiKeyService } from "../services/tokenLog.js";
+import { getTokenAnalytics, getTokenLogsForApiKeyService } from "../services/dashboard/tokenLog.js";
 
 const getAnalytics = async (req: Request, res: Response) => {
     const systemSlug = req.query.system_slug ? String(req.query.system_slug) : undefined;

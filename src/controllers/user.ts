@@ -1,5 +1,5 @@
 import express from "express";
-import * as userService from "../services/user.js";
+import * as userService from "../services/auth/user.js";
 
 export const getAllUsers = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {

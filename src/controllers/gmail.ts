@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { waitUntil } from "@vercel/functions";
-import { getWorkspace } from "../services/workspaces.js";
+import { getWorkspace } from "../services/workspaces/workspaces.js";
 import {
     completeGmailOAuth,
     createGmailAuthorizationUrl,
@@ -11,7 +11,7 @@ import {
     renewExpiringGmailWatches,
     sendGmailTestMessage,
     verifyGmailPubSubToken,
-} from "../services/gmail.js";
+} from "../services/integrations/gmail.js";
 import { GmailConnection } from "../models/index.js";
 import { unauthorizedError, unprocessableEntityError } from "../core/shared/errors/HttpError.js";
 

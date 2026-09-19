@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { ingestInstagramWebhook, verifyInstagramWebhook } from "../services/instagram.js";
-import { verifyMetaSignature } from "../services/metaWebhookSecurity.js";
+import { ingestInstagramWebhook, verifyInstagramWebhook } from "../services/integrations/instagram.js";
+import { verifyMetaSignature } from "../services/integrations/metaWebhookSecurity.js";
 import { ZodError } from "zod";
 
 export const verify = async (req: Request, res: Response) => {

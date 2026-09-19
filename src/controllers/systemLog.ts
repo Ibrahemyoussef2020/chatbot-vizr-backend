@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import { getLogs } from "../services/systemLog.js";
+import { getLogs } from "../services/dashboard/systemLog.js";
 
 const index = async (req: Request, res: Response) => {
     const level = req.query.level ? String(req.query.level) : undefined;

@@ -2,7 +2,7 @@ import { unauthorizedError } from "../../core/shared/errors/HttpError.js";
 import { passwordUtils } from "../../lib/index.js";
 import User from "../../models/User.js";
 import createToken, { UserTokenPayload } from "../../utils/createToken.js";
-import { ensureUserWorkspace } from "../workspaces.js";
+import { ensureUserWorkspace } from "../workspaces/workspaces.js";
 import getSessionService from "./session.js";
 
 export interface UserLoginInput {

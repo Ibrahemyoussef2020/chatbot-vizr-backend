@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { getOverview } from "../services/dashboardOverview.js";
+import { getOverview } from "../services/dashboard/dashboardOverview.js";
 
 export const overview = async (
     req: Request,

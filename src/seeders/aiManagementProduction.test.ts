@@ -7,7 +7,7 @@ import { AIAgent, AIModel, AIProvider, AIQuotaPolicy, AIRequestLog, AIRoutingPol
 import { seedProductionAIManagement } from "./aiManagementProduction.seeder.js";
 import { seedAIQuotaBaseline } from "./aiQuotaBaseline.seeder.js";
 import { seedAITraffic } from "./aiTraffic.seeder.js";
-import { getAIAnalyticsService, listAIRequestLogsService, getAIOverviewService, listAIQuotasService } from "../services/aiManagement.js";
+import { getAIAnalyticsService, listAIRequestLogsService, getAIOverviewService, listAIQuotasService } from "../services/ai/aiManagement.js";
 
 test("production starter seed preserves settings, telemetry and tenant boundaries on reruns", async () => {
     const server = await MongoMemoryServer.create({

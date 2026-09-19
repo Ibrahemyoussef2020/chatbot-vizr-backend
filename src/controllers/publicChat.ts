@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import * as service from "../services/publicChat.js";
+import * as service from "../services/chat/publicChat.js";
 
 const getSessionToken = (req: Request) => {
     const headerToken = req.get("X-Chat-Session");

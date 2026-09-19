@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { getThreadAnalytics } from "../services/dashboardAnalytics.js";
+import { getThreadAnalytics } from "../services/dashboard/dashboardAnalytics.js";
 
 export const analytics = async (
     req: Request,

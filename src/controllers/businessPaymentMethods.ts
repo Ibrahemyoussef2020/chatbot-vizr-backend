@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import { listBusinessPaymentMethods, saveBusinessPaymentMethod } from "../services/businessPaymentMethods.js";
+import { listBusinessPaymentMethods, saveBusinessPaymentMethod } from "../services/payments/businessPaymentMethods.js";
 
 const list = async (_req: Request, res: Response) => {
     const data = await listBusinessPaymentMethods(res.locals.user);

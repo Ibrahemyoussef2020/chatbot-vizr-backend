@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import * as service from "../services/aiManagement.js";
+import * as service from "../services/ai/aiManagement.js";
 const slug = (req: Request) => typeof req.query.system_slug === "string" ? req.query.system_slug : undefined;
 const trafficSource = (req: Request): "runtime" | "demo" | "all" => req.query.source === "runtime" ? "runtime" : req.query.source === "demo" ? "demo" : "all";
 const id = (req: Request) => String(req.params.id);

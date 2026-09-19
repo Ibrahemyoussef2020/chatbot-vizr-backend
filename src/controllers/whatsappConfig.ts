@@ -9,7 +9,7 @@ import {
     getWhatsAppTemplatesService,
     getWhatsAppConversationStatusService,
     getWhatsAppConnectionStatusService,
-} from "../services/whatsappConfig.js";
+} from "../services/integrations/whatsappConfig.js";
 
 const parseSlug = (req: Request): string | undefined => {
     const slug = req.query.system_slug || req.query.system || req.body?.system_slug;

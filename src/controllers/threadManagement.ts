@@ -6,7 +6,7 @@ import {
     assignThreadToAgentService,
     replyToThreadService,
     updateThreadStatusService,
-} from "../services/threadManagement.js";
+} from "../services/chat/threadManagement.js";
 
 const parseParamId = (req: Request): string => {
     const id = req.params.id;

@@ -17,7 +17,7 @@ import { KnowledgeOutputAIFactory } from "./core/knowledge/knowledge-output-ai.f
 import { VercelKnowledgeOutputProvider } from "./core/knowledge/vercel-knowledge-output.provider.js";
 import { channelReplyQueueRegistry } from "./core/jobs/channel-reply.job.js";
 import { VercelChannelReplyQueue } from "./infrastructure/queue/vercel-channel-reply.queue.js";
-import { ChannelReplyJobProcessor, markChannelReplyJobFailed } from "./services/channelReplyJobProcessor.js";
+import { ChannelReplyJobProcessor, markChannelReplyJobFailed } from "./services/chat/channelReplyJobProcessor.js";
 
 dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
 

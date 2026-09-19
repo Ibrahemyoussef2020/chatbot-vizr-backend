@@ -7,7 +7,7 @@ import {
     deleteTelegramBotService,
     sendTelegramTestMessageService,
     handleTelegramWebhookService,
-} from "../services/telegramBot.js";
+} from "../services/integrations/telegramBot.js";
 
 export const handleTelegramWebhook = async (req: Request, res: Response): Promise<void> => {
     try {

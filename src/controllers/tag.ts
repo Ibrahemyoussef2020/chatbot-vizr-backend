@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import * as service from "../services/tag.js";
+import * as service from "../services/dashboard/tag.js";
 
 const list = async (req: Request, res: Response) => {
     const systemSlug = req.query.system_slug ? String(req.query.system_slug) : undefined;

@@ -2,8 +2,8 @@ import "dotenv/config";
 import dns from "node:dns";
 import mongoose from "mongoose";
 import { TelegramBot, MetaChannelConfig, Workspace } from "../models/index.js";
-import { initializeAllWorkspaceChannelDefaults } from "../services/channelDefaults.js";
-import { listFilteredThreads } from "../services/threadManagement.js";
+import { initializeAllWorkspaceChannelDefaults } from "../services/integrations/channelDefaults.js";
+import { listFilteredThreads } from "../services/chat/threadManagement.js";
 
 // Existing global account indexes must become workspace-scoped before defaults can be copied.
 const run = async () => {

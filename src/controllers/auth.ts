@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 import { getCookieOptions } from "../lib/index.js";
-import { authService } from "../services/index.js";
+import { authServices as authService } from "../services/index.js";
 
 const register = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
     const result = await authService.registerService(req.body);

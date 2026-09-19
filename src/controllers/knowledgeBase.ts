@@ -8,14 +8,14 @@ import {
     selectKnowledgeModel,
     updateKnowledgeSession,
     deleteKnowledgeSession,
-} from "../services/knowledgeBase.js";
+} from "../services/knowledge/knowledgeBase.js";
 import {
     cancelKnowledgeUpload,
     completeKnowledgeUpload,
     initiateKnowledgeUpload,
     recordKnowledgeUploadProgress,
     refreshKnowledgeUpload,
-} from "../services/knowledgeUpload.js";
+} from "../services/knowledge/knowledgeUpload.js";
 import {
     createKnowledgeOutputSchema,
     deleteKnowledgeOutputSchema,
@@ -34,7 +34,7 @@ import {
     setKnowledgeOutputSaved,
     shareKnowledgeOutput,
     unshareKnowledgeOutput,
-} from "../services/knowledgeOutput.js";
+} from "../services/knowledge/knowledgeOutput.js";
 
 const parseSlug = (req: Request) => String(
     req.query.system_slug || req.body?.system_slug || "",

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import { deleteAIConfigSourceService, deleteAIConfigService, getAIConfigService, listAIConfigSourcesService, saveAIConfigService, uploadAIConfigSourcesService } from "../services/aiConfig.js";
+import { deleteAIConfigSourceService, deleteAIConfigService, getAIConfigService, listAIConfigSourcesService, saveAIConfigService, uploadAIConfigSourcesService } from "../services/ai/aiConfig.js";
 
 const parseSlug = (req: Request): string | undefined => {
     const slug = req.query.system_slug || req.query.system || req.body?.system_slug;

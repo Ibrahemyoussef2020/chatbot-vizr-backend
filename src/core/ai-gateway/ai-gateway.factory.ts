@@ -1,5 +1,5 @@
 import { IAIService } from './ai.interface.js';
-import { assertAIProviderEnabled } from '../../services/aiProviderPolicy.js';
+import { assertAIProviderEnabled } from '../../services/ai/aiProviderPolicy.js';
 
 export type AIProviderType = 'vercel' | 'custom' | string;
 

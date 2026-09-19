@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { runAIGateway } from '../../services/aiGateway.js';
+import { runAIGateway } from '../../services/ai/aiGateway.js';
 
 export class AIController {
     public static async handleStream(req: Request, res: Response, next: NextFunction): Promise<void> {

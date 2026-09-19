@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type { Request, Response } from "express";
-import { recoverStaleChannelReplies } from "../services/channelReplyJobs.js";
+import { recoverStaleChannelReplies } from "../services/chat/channelReplyJobs.js";
 
 const authorized = (req: Request) => {
     const secret = process.env.CRON_SECRET || "";

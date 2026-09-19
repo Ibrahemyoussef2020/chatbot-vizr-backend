@@ -1,5 +1,5 @@
 import type { IKnowledgeOutputAI } from "./knowledge-output-ai.interface.js";
-import { assertAIProviderEnabled } from "../../services/aiProviderPolicy.js";
+import { assertAIProviderEnabled } from "../../services/ai/aiProviderPolicy.js";
 
 export type KnowledgeAIProviderType = "vercel" | "custom" | string;
 

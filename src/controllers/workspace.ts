@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import * as workspaceService from "../services/workspaces.js";
+import * as workspaceService from "../services/workspaces/workspaces.js";
 
 const index = async (req: Request, res: Response) => {
     const data = await workspaceService.listWorkspaces(res.locals.user);

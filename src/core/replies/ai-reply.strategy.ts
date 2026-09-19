@@ -1,8 +1,8 @@
 ﻿import { Conversation, Message } from "../../models/index.js";
 import HttpError, { createHttpError } from "../shared/errors/HttpError.js";
 import { withAiReplySlot } from "./ai-reply.policy.js";
-import { generateAIReply } from "../../services/aiExecution.js";
-import { prepareAIConversation } from "../../services/aiContext.js";
+import { generateAIReply } from "../../services/ai/aiExecution.js";
+import { prepareAIConversation } from "../../services/ai/aiContext.js";
 import type { AiReplyInput, ReplyResult, ReplyStrategy } from "./reply.types.js";
 
 export class AiReplyStrategy implements ReplyStrategy<AiReplyInput> {

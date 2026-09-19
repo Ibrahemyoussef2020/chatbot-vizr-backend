@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { listRolesService, saveRoleService, deleteRoleService, listPermissionsService } from "../services/securityRole.js";
+import { listRolesService, saveRoleService, deleteRoleService, listPermissionsService } from "../services/auth/securityRole.js";
 
 const parseSlug = (req: Request): string | undefined => {
     const slug = req.query.system_slug || req.query.system || req.body?.system_slug;

@@ -4,7 +4,7 @@ import {
     saveWidgetConfigService,
     deleteWidgetConfigService,
     getWidgetEmbedScriptService,
-} from "../services/widgetConfig.js";
+} from "../services/integrations/widgetConfig.js";
 
 const parseSlug = (req: Request): string | undefined => {
     const slug = req.query.system_slug || req.query.system || req.body?.system_slug;

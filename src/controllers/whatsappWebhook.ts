@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import {
     verifyWhatsAppWebhookService,
     handleWhatsAppWebhookEventService,
-} from "../services/whatsappWebhook.js";
-import { verifyMetaSignature } from "../services/metaWebhookSecurity.js";
+} from "../services/integrations/whatsappWebhook.js";
+import { verifyMetaSignature } from "../services/integrations/metaWebhookSecurity.js";
 import { ZodError } from "zod";
 
 /**

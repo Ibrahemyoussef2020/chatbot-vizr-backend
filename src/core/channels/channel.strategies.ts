@@ -1,7 +1,7 @@
-import { sendTelegramTestMessageService } from "../../services/telegramBot.js";
-import { sendWhatsAppTestMessageService } from "../../services/whatsappConfig.js";
-import { sendGmailReply } from "../../services/gmail.js";
-import { sendInstagramReply } from "../../services/instagram.js";
+import { sendTelegramTestMessageService } from "../../services/integrations/telegramBot.js";
+import { sendWhatsAppTestMessageService } from "../../services/integrations/whatsappConfig.js";
+import { sendGmailReply } from "../../services/integrations/gmail.js";
+import { sendInstagramReply } from "../../services/integrations/instagram.js";
 import { channelStrategyRegistry } from "./channel.registry.js";
 import type { ChannelStrategy } from "./channel.types.js";
 

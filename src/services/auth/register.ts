@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
 import User from "../../models/User.js";
 import createToken, { UserTokenPayload } from "../../utils/createToken.js";
-import { createInitialWorkspace } from "../workspaces.js";
+import { createInitialWorkspace } from "../workspaces/workspaces.js";
 
 interface RegisterInput {
     name: string;
