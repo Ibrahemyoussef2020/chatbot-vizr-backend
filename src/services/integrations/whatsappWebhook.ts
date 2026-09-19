@@ -97,8 +97,6 @@ const handleWhatsAppWebhookValue = async (value: any): Promise<void> => {
 
     const workspace = await Workspace.findById(config.workspaceId).exec();
     if (!workspace) throw new Error("WhatsApp inbound workspace was not found.");
-    const alreadyRecorded = await SystemLog.exists({ category: "whatsapp-inbound", "metadata.messageId": message.id });
-    if (alreadyRecorded) continue;
     const profileName = value?.contacts?.[0]?.profile?.name || `WhatsApp ${fromPhone}`;
     const saved = await saveInboundChannelMessage({
         systemSlug: workspace.slug,
@@ -120,7 +118,10 @@ const handleWhatsAppWebhookValue = async (value: any): Promise<void> => {
         recipientId: String(fromPhone),
         channelAccountId: String(phoneNumberId),
     });
-    if (!alreadyRecorded) await SystemLog.create({
+    // The unique externalMessageId index makes persistence idempotent. Do not use
+    // SystemLog as a dedupe gate: a prior partial webhook attempt may have logged
+    // the event before queueing completed, and Meta retries must still be processed.
+    if (!saved.duplicate) await SystemLog.create({
         publicId: `wa_${randomUUID()}`,
         systemSlug: workspace?.slug || "unknown",
         level: "info",
