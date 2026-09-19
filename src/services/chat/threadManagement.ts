@@ -189,7 +189,9 @@ export const getThreadMessagesService = async (threadId: string) => {
         },
         messages: messages.map((m) => ({
             id: String(m._id),
-            sender_type: m.senderType,
+            // The inbox has two visual roles: assistant and customer. Normalize
+            // legacy/alternate customer labels so they cannot render as bot replies.
+            sender_type: m.senderType === "assistant" ? "assistant" : "visitor",
             received_from: m.receivedFrom || conversation.receivedFrom || "web",
             content: m.content,
             attachments: m.attachments,
