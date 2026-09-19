@@ -189,9 +189,9 @@ export const getThreadMessagesService = async (threadId: string) => {
         },
         messages: messages.map((m) => ({
             id: String(m._id),
-            // The inbox has two visual roles: assistant and customer. Normalize
-            // legacy/alternate customer labels so they cannot render as bot replies.
-            sender_type: m.senderType === "assistant" ? "assistant" : "visitor",
+            // Preserve the persisted role. Accept the snake_case field used by
+            // legacy/raw MongoDB records without turning missing roles into bots.
+            sender_type: m.senderType || (m as { sender_type?: string }).sender_type || "visitor",
             received_from: m.receivedFrom || conversation.receivedFrom || "web",
             content: m.content,
             attachments: m.attachments,
