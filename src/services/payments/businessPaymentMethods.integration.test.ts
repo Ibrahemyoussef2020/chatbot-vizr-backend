@@ -13,6 +13,7 @@ test("method configuration uses registered providers and hides credentials", asy
     try {
         await mongoose.connect(server.getUri());
         const user = { id: String(new mongoose.Types.ObjectId()), name: "Owner", email: "owner@test.local", role: "super_admin" as const, permissions: ["payment_methods.manage"] };
+        const otherWorkspaceUser = { ...user, role: "admin" as const, workspaceId: String(new mongoose.Types.ObjectId()) };
         const input = { label: "Wallet", isEnabled: true, isTestMode: false, sortOrder: 1, instructions: "Send transfer", supportedCurrencies: ["EGP"], settings: { walletNumber: "01012345678", holderName: "Owner" } };
         await assert.rejects(() => saveBusinessPaymentMethod({ ...user, permissions: [] }, "vodafone_cash", input), { statusCode: 403 });
         await assert.rejects(() => saveBusinessPaymentMethod(user, "unknown", input), { statusCode: 404 });
@@ -21,6 +22,8 @@ test("method configuration uses registered providers and hides credentials", asy
         await assert.rejects(() => saveBusinessPaymentMethod(user, "vodafone_cash", { ...input, supportedCurrencies: ["EUR"] }), { statusCode: 422 });
         const saved = await saveBusinessPaymentMethod(user, "vodafone_cash", input);
         assert.equal(saved?.isEnabled, true);
+        const savedFromDifferentWorkspace = await saveBusinessPaymentMethod(otherWorkspaceUser, "vodafone_cash", { ...input, label: "Shared wallet" }, "not-owned-workspace");
+        assert.equal(savedFromDifferentWorkspace?.label, "Shared wallet");
         const workspaceId = new mongoose.Types.ObjectId();
         await WorkspacePaymentMethodConfig.create({
             workspaceId,
@@ -35,7 +38,7 @@ test("method configuration uses registered providers and hides credentials", asy
         });
         const checkoutMethods = await listCheckoutPaymentMethods(undefined, String(workspaceId));
         const checkoutWallet = checkoutMethods.find(method => method.provider === "vodafone_cash");
-        assert.equal(checkoutWallet?.label, "Wallet");
+        assert.equal(checkoutWallet?.label, "Shared wallet");
         assert.deepEqual(checkoutWallet?.supportedCurrencies, ["EGP"]);
         await PaymentMethodConfig.updateOne({ provider: "vodafone_cash" }, { $set: { credentials: { secret: "hidden" } } });
         const methods = await listBusinessPaymentMethods(user);

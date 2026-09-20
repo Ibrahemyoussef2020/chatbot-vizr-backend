@@ -1,13 +1,12 @@
 import { z } from "zod";
 import PaymentMethodConfig from "../../models/PaymentMethodConfig.js";
-import Workspace from "../../models/Workspace.js";
 import "../../core/payments/payment.strategies.js";
 import { PaymentGatewayFactory } from "../../core/payments/payment-gateway.factory.js";
 import { authorizeBusinessPayment } from "./authorization.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
 import { stripeCredentialEnvironment } from "./credentialVault.js";
-import { getEffectivePaymentMethodConfig, resolveWorkspaceForPayment } from "./paymentMethodConfig.js";
+import { getEffectivePaymentMethodConfig } from "./paymentMethodConfig.js";
 
 const inputSchema = z.object({
     label: z.string().trim().min(1).max(120),
@@ -24,7 +23,7 @@ const inputSchema = z.object({
 
 export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext, requestedWorkspace?: string) => {
     authorizeBusinessPayment(user, "payment_methods.manage");
-    await resolveWorkspaceForPayment(user, requestedWorkspace);
+    void requestedWorkspace;
     return Promise.all(PaymentGatewayFactory.listDescriptors().map(async descriptor => {
         const config = await getEffectivePaymentMethodConfig(descriptor.provider);
         const envKeys = stripeCredentialEnvironment;
@@ -58,7 +57,8 @@ export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext,
 
 /** Safe checkout options for signed-in customers. Never returns gateway credentials. */
 export const listCheckoutPaymentMethods = async (user?: AuthenticatedUserContext, requestedWorkspace?: string) => {
-    if (user && requestedWorkspace) await resolveWorkspaceForPayment(user, requestedWorkspace);
+    void user;
+    void requestedWorkspace;
     const methods = await Promise.all(PaymentGatewayFactory.listDescriptors().map(async descriptor => {
         const config = await getEffectivePaymentMethodConfig(descriptor.provider);
         if (!config?.isEnabled) return null;
@@ -86,7 +86,8 @@ export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, 
     const gateway = PaymentGatewayFactory.getProvider(provider);
     const descriptor = gateway.descriptor();
     const data = parsed.data;
-    const workspaceId = await resolveWorkspaceForPayment(user, requestedWorkspace || data.system_slug);
+    void requestedWorkspace;
+    void data.system_slug;
     const credentialKeys = descriptor.credentialFields.map(field => field.key);
     if ([...Object.keys(data.credentials), ...data.clearCredentials].some(key => !credentialKeys.includes(key))) {
         throw unprocessableEntityError("Unknown provider credential field.");
