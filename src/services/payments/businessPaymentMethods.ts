@@ -2,9 +2,9 @@ import { z } from "zod";
 import PaymentMethodConfig from "../../models/PaymentMethodConfig.js";
 import "../../core/payments/payment.strategies.js";
 import { PaymentGatewayFactory } from "../../core/payments/payment-gateway.factory.js";
-import { authorizeBusinessPayment } from "./authorization.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
+import { forbiddenError } from "../../core/shared/errors/HttpError.js";
 import { stripeCredentialEnvironment } from "./credentialVault.js";
 import { getEffectivePaymentMethodConfig } from "./paymentMethodConfig.js";
 
@@ -22,7 +22,7 @@ const inputSchema = z.object({
 }).strict();
 
 export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext, requestedWorkspace?: string) => {
-    authorizeBusinessPayment(user, "payment_methods.manage");
+    if (user.role !== "super_admin") throw forbiddenError("Only the platform owner can manage global payment methods.");
     void requestedWorkspace;
     return Promise.all(PaymentGatewayFactory.listDescriptors().map(async descriptor => {
         const config = await getEffectivePaymentMethodConfig(descriptor.provider);
@@ -79,7 +79,7 @@ export const listCheckoutPaymentMethods = async (user?: AuthenticatedUserContext
 };
 
 export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, provider: string, input: unknown, requestedWorkspace?: string) => {
-    authorizeBusinessPayment(user, "payment_methods.manage");
+    if (user.role !== "super_admin") throw forbiddenError("Only the platform owner can manage global payment methods.");
     if (!PaymentGatewayFactory.hasProvider(provider)) throw notFoundError("Payment provider not found.");
     const parsed = inputSchema.safeParse(input);
     if (!parsed.success) throw unprocessableEntityError("Invalid payment method settings.");

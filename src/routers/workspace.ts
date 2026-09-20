@@ -48,8 +48,8 @@ workspaceRouter.post("/features", requirePermission("plans.manage"), businessFea
 workspaceRouter.put("/features/:id", requirePermission("plans.manage"), businessFeatures.update);
 workspaceRouter.delete("/features/:id", requirePermission("plans.manage"), businessFeatures.remove);
 workspaceRouter.get("/subscriptions", requirePermission("subscriptions.view"), businessSubscriptions.index);
-workspaceRouter.get("/payment-methods", requirePermission("payment_methods.manage"), businessPaymentMethods.index);
-workspaceRouter.put("/payment-methods/:provider", requirePermission("payment_methods.manage"), businessPaymentMethods.update);
+workspaceRouter.get("/payment-methods", businessPaymentMethods.index);
+workspaceRouter.put("/payment-methods/:provider", businessPaymentMethods.update);
 workspaceRouter.get("/payments", requirePermission("payments.view"), businessPayments.index);
 workspaceRouter.get("/payments/:id", requirePermission("payments.view"), businessPayments.show);
 workspaceRouter.get("/pricings", requirePermission("plans.manage"), businessPlans.index);

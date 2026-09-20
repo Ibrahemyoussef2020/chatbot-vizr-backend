@@ -13,9 +13,9 @@ test("method configuration uses registered providers and hides credentials", asy
     try {
         await mongoose.connect(server.getUri());
         const user = { id: String(new mongoose.Types.ObjectId()), name: "Owner", email: "owner@test.local", role: "super_admin" as const, permissions: ["payment_methods.manage"] };
-        const otherWorkspaceUser = { ...user, role: "admin" as const, workspaceId: String(new mongoose.Types.ObjectId()) };
+        const otherWorkspaceUser = { ...user, workspaceId: String(new mongoose.Types.ObjectId()) };
         const input = { label: "Wallet", isEnabled: true, isTestMode: false, sortOrder: 1, instructions: "Send transfer", supportedCurrencies: ["EGP"], settings: { walletNumber: "01012345678", holderName: "Owner" } };
-        await assert.rejects(() => saveBusinessPaymentMethod({ ...user, permissions: [] }, "vodafone_cash", input), { statusCode: 403 });
+        await assert.rejects(() => saveBusinessPaymentMethod({ ...user, role: "admin" as const, permissions: [] }, "vodafone_cash", input), { statusCode: 403 });
         await assert.rejects(() => saveBusinessPaymentMethod(user, "unknown", input), { statusCode: 404 });
         await assert.rejects(() => saveBusinessPaymentMethod(user, "vodafone_cash", { ...input, settings: {} }));
         await assert.rejects(() => saveBusinessPaymentMethod(user, "vodafone_cash", { ...input, settings: { ...input.settings, feePercent: 101 } }), { statusCode: 422 });
