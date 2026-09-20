@@ -9,6 +9,7 @@ const workspaceProfileValidators = [
     body("country").optional({ values: "falsy" }).trim().isLength({ max: 120 }).withMessage("Country must be 120 characters or fewer"),
     body("timezone").optional({ values: "falsy" }).trim().isLength({ max: 100 }).withMessage("Timezone must be 100 characters or fewer"),
     body("currency").optional({ values: "falsy" }).trim().matches(/^[A-Z]{3}$/i).withMessage("Currency must be a 3-letter code"),
+    body("selected_plan_code").optional({ values: "falsy" }).trim().isLength({ max: 120 }).withMessage("Plan code is too long"),
 ];
 
 export const createWorkspaceValidator = [

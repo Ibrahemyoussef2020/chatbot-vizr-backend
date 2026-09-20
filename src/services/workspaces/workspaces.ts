@@ -81,6 +81,7 @@ const serialize = (workspace: {
     country?: string;
     timezone?: string;
     currency?: string;
+    selectedPlanCode?: string;
     isActive: boolean;
     rateLimit: number;
     createdAt?: Date;
@@ -97,6 +98,7 @@ const serialize = (workspace: {
     country: workspace.country || "",
     timezone: workspace.timezone || "UTC",
     currency: workspace.currency || "USD",
+    selected_plan_code: workspace.selectedPlanCode || "",
     is_active: workspace.isActive,
     rate_limit: workspace.rateLimit,
     created_at: workspace.createdAt,
@@ -121,6 +123,7 @@ export const createWorkspace = async (
         country?: string;
         timezone?: string;
         currency?: string;
+        selected_plan_code?: string;
         rate_limit?: number;
     },
 ) => {
@@ -139,6 +142,7 @@ export const createWorkspace = async (
         country: input.country?.trim() || "",
         timezone: input.timezone?.trim() || "UTC",
         currency: input.currency?.trim().toUpperCase() || "USD",
+        selectedPlanCode: input.selected_plan_code?.trim().toLowerCase() || "",
         ownerId: user.id,
         rateLimit: input.rate_limit ?? 60,
         isActive: true,
@@ -173,6 +177,7 @@ export const updateWorkspace = async (
         country?: string;
         timezone?: string;
         currency?: string;
+        selected_plan_code?: string;
         is_active?: boolean;
         rate_limit?: number;
     },
@@ -189,6 +194,7 @@ export const updateWorkspace = async (
     if (input.country !== undefined) changes.country = input.country.trim();
     if (input.timezone !== undefined) changes.timezone = input.timezone.trim();
     if (input.currency !== undefined) changes.currency = input.currency.trim().toUpperCase();
+    if (input.selected_plan_code !== undefined) changes.selectedPlanCode = input.selected_plan_code.trim().toLowerCase();
     if (input.is_active !== undefined) changes.isActive = input.is_active;
     if (input.rate_limit !== undefined) changes.rateLimit = input.rate_limit;
     if (!Object.keys(changes).length) throw unprocessableEntityError("No workspace changes were supplied");

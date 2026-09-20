@@ -11,6 +11,7 @@ export interface IWorkspace extends Document {
     country: string;
     timezone: string;
     currency: string;
+    selectedPlanCode: string;
     ownerId: Types.ObjectId;
     isActive: boolean;
     rateLimit: number;
@@ -31,6 +32,7 @@ const WorkspaceSchema = new Schema<IWorkspace>(
         country: { type: String, default: "", trim: true, maxlength: 120 },
         timezone: { type: String, default: "UTC", trim: true, maxlength: 100 },
         currency: { type: String, default: "USD", trim: true, uppercase: true, minlength: 3, maxlength: 3 },
+        selectedPlanCode: { type: String, default: "", trim: true, lowercase: true, maxlength: 120 },
         ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
         isActive: { type: Boolean, default: true, index: true },
         rateLimit: { type: Number, default: 60, min: 1, max: 1000 },

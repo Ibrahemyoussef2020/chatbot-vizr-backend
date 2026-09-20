@@ -4,7 +4,8 @@ import "../../core/payments/payment.strategies.js";
 import type { GatewayConfig, PaymentProvider } from "../../core/payments/payment.types.js";
 import { gatewayDisabledError } from "../../core/shared/errors/PaymentError.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
-import { PaymentMethodConfig, PaymentTransaction, Plan } from "../../models/index.js";
+import { PaymentMethodConfig, PaymentTransaction, Plan, Subscription, Workspace } from "../../models/index.js";
+import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 
 export interface SubscriptionInput {
     planCode: string;
@@ -15,7 +16,7 @@ export interface SubscriptionInput {
     payerFields?: Record<string, string>;
 }
 
-export const subscribeToPlan = async (input: SubscriptionInput) => {
+export const subscribeToPlan = async (input: SubscriptionInput, user?: AuthenticatedUserContext) => {
     const planCode = input.planCode?.toLowerCase().trim();
     if (!planCode) {
         throw unprocessableEntityError("Plan code is required");
@@ -27,6 +28,9 @@ export const subscribeToPlan = async (input: SubscriptionInput) => {
     const billingCycle = input.billingCycle === "yearly" ? "yearly" : "monthly";
     const plan = await Plan.findOne({ code: planCode, status: "published", visibility: "public" }).exec();
     if (!plan) throw notFoundError("Published plan not found.");
+    if (user && (!user.workspaceId || user.role === "super_admin")) {
+        throw unprocessableEntityError("A customer workspace is required to start a subscription.");
+    }
     const price = plan.pricing[billingCycle];
     if (price == null || price <= 0) throw unprocessableEntityError(`The ${billingCycle} price is not configured for this plan.`);
     if (plan.allowedProviders.length && !plan.allowedProviders.includes(provider)) {
@@ -68,7 +72,12 @@ export const subscribeToPlan = async (input: SubscriptionInput) => {
         amount,
         currency,
         reference,
-        payer: { email: input.email?.trim(), name: input.name?.trim() },
+        payer: {
+            id: user?.id,
+            workspaceId: user?.workspaceId,
+            email: input.email?.trim() || user?.email,
+            name: input.name?.trim() || user?.name,
+        },
         payerFields: input.payerFields || {},
         config: gatewayConfig,
         successUrl: `${process.env.FRONTEND_URL || ""}/payment/success?reference=${encodeURIComponent(reference)}`,
@@ -77,6 +86,7 @@ export const subscribeToPlan = async (input: SubscriptionInput) => {
 
     await PaymentTransaction.create({
         reference,
+        ...(user ? { userId: user.id, workspaceId: user.workspaceId } : {}),
         planId: plan._id,
         planCode: plan.code,
         provider,
@@ -85,8 +95,8 @@ export const subscribeToPlan = async (input: SubscriptionInput) => {
         currency,
         status: result.status,
         providerRef: result.providerRef,
-        payerEmail: input.email?.trim().toLowerCase() || "",
-        payerName: input.name?.trim() || "",
+        payerEmail: input.email?.trim().toLowerCase() || user?.email || "",
+        payerName: input.name?.trim() || user?.name || "",
         payerFields: result.payerFields || {},
     });
 
@@ -106,5 +116,65 @@ export const subscribeToPlan = async (input: SubscriptionInput) => {
             checkoutUrl: result.redirectUrl,
             instructions: result.instructions,
         },
+    };
+};
+
+export const startFreeSubscription = async (
+    user: AuthenticatedUserContext,
+    planCode: string,
+    billingCycle: "monthly" | "yearly" = "monthly",
+) => {
+    if (!user.workspaceId || user.role === "super_admin") {
+        throw unprocessableEntityError("A customer workspace is required to start a plan.");
+    }
+    const workspace = await Workspace.findOne({ _id: user.workspaceId, ownerId: user.id }).exec();
+    if (!workspace) throw notFoundError("Workspace not found.");
+    const plan = await Plan.findOne({ code: planCode.trim().toLowerCase(), status: "published", visibility: "public" }).exec();
+    if (!plan) throw notFoundError("Published plan not found.");
+    if (plan.pricing[billingCycle] !== 0) throw unprocessableEntityError("This plan is not free for the selected billing cycle.");
+
+    const start = new Date();
+    const end = new Date(start);
+    if (billingCycle === "yearly") end.setFullYear(end.getFullYear() + 1);
+    else end.setMonth(end.getMonth() + 1);
+
+    const subscription = await Subscription.findOneAndUpdate(
+        { workspaceId: workspace._id, status: { $in: ["trialing", "active", "past_due"] } },
+        {
+            $set: {
+                planId: plan._id,
+                planCode: plan.code,
+                status: "active",
+                billingCycle,
+                currentPeriodStart: start,
+                currentPeriodEnd: end,
+                provider: "free",
+                cancelAtPeriodEnd: false,
+            },
+            $setOnInsert: { workspaceId: workspace._id },
+        },
+        { upsert: true, new: true, runValidators: true },
+    ).exec();
+
+    return { planCode: plan.code, status: subscription.status, currentPeriodEnd: subscription.currentPeriodEnd };
+};
+
+export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserContext) => {
+    if (!user.workspaceId || user.role === "super_admin") {
+        return { active: false, planCode: null };
+    }
+    const workspace = await Workspace.findById(user.workspaceId).select("selectedPlanCode").lean().exec();
+    if (!workspace?.selectedPlanCode) return { active: false, planCode: null };
+    const subscription = await Subscription.findOne({
+        workspaceId: user.workspaceId,
+        status: { $in: ["trialing", "active"] },
+        currentPeriodEnd: { $gt: new Date() },
+    }).select("planCode status currentPeriodEnd").lean().exec();
+    const matchesSelectedPlan = subscription?.planCode === workspace.selectedPlanCode;
+    return {
+        active: Boolean(matchesSelectedPlan),
+        planCode: matchesSelectedPlan ? subscription?.planCode || null : null,
+        status: matchesSelectedPlan ? subscription?.status || null : null,
+        currentPeriodEnd: matchesSelectedPlan ? subscription?.currentPeriodEnd || null : null,
     };
 };

@@ -7,6 +7,7 @@ import workspaceRouter from "./workspace.js";
 import subscriptionRouter from "./subscription.js";
 import { whatsappWebhookController, telegramBotController, gmailController, publicChatController, instagramWebhookController, channelRecoveryController } from "../controllers/index.js";
 import { publicRateLimit } from "../middlewares/publicRateLimit.middleware.js";
+import { stripeWebhook } from "../controllers/stripeWebhook.js";
 
 const appRouter = Router();
 
@@ -18,6 +19,7 @@ appRouter.get("/instagram/webhook", instagramWebhookController.verify);
 appRouter.post("/instagram/webhook", instagramWebhookController.handle);
 appRouter.get("/google/callback", gmailController.callback);
 appRouter.post("/gmail/webhook", gmailController.webhook);
+appRouter.post("/webhooks/stripe", stripeWebhook);
 appRouter.get("/gmail/cron/renew", gmailController.cronRenewWatches);
 appRouter.get("/internal/channel-jobs/recover", channelRecoveryController.recover);
 
