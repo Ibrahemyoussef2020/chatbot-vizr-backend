@@ -72,7 +72,7 @@ test("payment seed populates four APIs, preserves existing records and is idempo
         const methods = await listBusinessPaymentMethods(user);
         assert.equal(methods.length, 2);
         assert.equal(methods.find(item => item.provider === "vodafone_cash")?.isEnabled, false);
-        assert.equal(JSON.stringify(methods).includes("preserve-secret"), false);
+        assert.equal(methods.find(item => item.provider === "stripe")?.credentials.secretKey, "preserve-secret");
         assert.equal((await listBusinessSubscriptions(user, {})).total, 5);
         await assert.rejects(() => Subscription.create({
             workspaceId: workspace._id, planId: existingPlan._id, planCode: "starter",

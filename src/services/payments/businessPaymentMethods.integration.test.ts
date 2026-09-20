@@ -51,6 +51,8 @@ test("method configuration uses registered providers and hides credentials", asy
         const checkoutWallet = checkoutMethods.find(method => method.provider === "vodafone_cash");
         assert.equal(checkoutWallet?.label, "Shared wallet");
         assert.deepEqual(checkoutWallet?.supportedCurrencies, ["EGP"]);
+        const checkoutStripe = checkoutMethods.find(method => method.provider === "stripe");
+        assert.equal(checkoutStripe?.supportedCurrencies.includes("USD"), true);
         await PaymentMethodConfig.updateOne({ provider: "vodafone_cash" }, { $set: { credentials: { secret: "hidden" } } });
         const methods = await listBusinessPaymentMethods(user);
         assert.equal(methods.length, 2);
