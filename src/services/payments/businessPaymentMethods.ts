@@ -43,6 +43,12 @@ export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext,
             availableCurrencies: descriptor.supportedCurrencies,
             credentialFields: descriptor.credentialFields,
             credentialStatus,
+            // This endpoint is restricted to the platform owner. Return decrypted values
+            // so the owner can review and edit saved keys; checkout uses a safe projection.
+            credentials: Object.fromEntries(descriptor.credentialFields.flatMap(field => {
+                const value = config?.credentials?.[field.key];
+                return typeof value === "string" && value ? [[field.key, value]] : [];
+            })),
             workspaceName: "Global settings",
             label: config?.label || descriptor.label,
             isEnabled: config?.isEnabled || false,
