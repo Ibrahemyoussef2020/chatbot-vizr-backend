@@ -1,7 +1,10 @@
 import { QueueClient } from "@vercel/queue";
 import connectDB from "../src/db/index.js";
+import { registerAIProviders } from "../src/core/ai-gateway/register-providers.js";
 import { channelReplyJobSchema, type ChannelReplyJob } from "../src/core/jobs/channel-reply.job.js";
 import { ChannelReplyJobProcessor, markChannelReplyJobFailed } from "../src/services/chat/channelReplyJobProcessor.js";
+
+registerAIProviders();
 
 const queue = new QueueClient();
 const processor = new ChannelReplyJobProcessor();

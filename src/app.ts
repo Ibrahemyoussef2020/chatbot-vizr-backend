@@ -5,12 +5,7 @@ import morgan from "morgan";
 import { fileURLToPath } from "node:url";
 import { errorHandler, corsMiddleware } from "./middlewares/index.js";
 import appRouter from "./routers/index.js";
-import { AIFactory } from "./core/ai-gateway/ai-gateway.factory.js";
-import { CustomAIProvider } from "./core/ai-gateway/providers/custom.provider.js";
-import { UnifiedAIProvider } from "./core/ai-gateway/providers/unified.provider.js";
-import { VercelGatewayAIProvider } from "./core/ai-gateway/providers/vercel-gateway.provider.js";
-import { createGoogleModel, createOpenAIModel, createAnthropicModel } from "./core/ai-gateway/providers/factories.js";
-import { compatibleProviderCodes, createCompatibleModelFactory } from "./core/ai-gateway/providers/compatible.factories.js";
+import { registerAIProviders } from "./core/ai-gateway/register-providers.js";
 import aiRouter from "./core/ai-gateway/ai.route.js";
 import { handleCloudinaryWebhook } from "./controllers/cloudinaryWebhook.js";
 import { KnowledgeOutputAIFactory } from "./core/knowledge/knowledge-output-ai.factory.js";
@@ -57,14 +52,8 @@ app.get("/health", (_req, res) => {
 
 
 
-AIFactory.registerProvider('custom', new CustomAIProvider());
-AIFactory.registerProvider('google', new UnifiedAIProvider('google', createGoogleModel));
-AIFactory.registerProvider('openai', new UnifiedAIProvider('openai', createOpenAIModel));
-AIFactory.registerProvider('anthropic', new UnifiedAIProvider('anthropic', createAnthropicModel));
-AIFactory.registerProvider('vercel', new VercelGatewayAIProvider());
-for (const providerCode of compatibleProviderCodes) {
-    AIFactory.registerProvider(providerCode, new UnifiedAIProvider(providerCode, createCompatibleModelFactory(providerCode)));
-}
+registerAIProviders();
+
 KnowledgeOutputAIFactory.registerProvider('vercel', new VercelKnowledgeOutputProvider());
 channelReplyQueueRegistry.register(new VercelChannelReplyQueue(async (job) => {
     try {
@@ -74,11 +63,6 @@ channelReplyQueueRegistry.register(new VercelChannelReplyQueue(async (job) => {
         throw error;
     }
 }));
-
-if (!process.env.DEFAULT_AI_PROVIDER) {
-    process.env.DEFAULT_AI_PROVIDER = 'vercel';
-}
-
 
 app.use('/api/ai', aiRouter);
 
