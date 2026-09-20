@@ -67,6 +67,7 @@ export interface GatewayEvent {
     currency?: string;
     providerCustomerId?: string;
     providerSubscriptionId?: string;
+    paymentIntentId?: string;
     failureReason?: string;
     raw?: unknown;
 }
@@ -78,6 +79,7 @@ export interface ConfigFieldDescriptor {
     required: boolean;
     /** Never returned in plaintext once stored. */
     secret?: boolean;
+    environmentKey?: string;
     placeholder?: string;
     helpText?: string;
     options?: string[];

@@ -4,7 +4,8 @@ import "../../core/payments/payment.strategies.js";
 import type { GatewayConfig, PaymentProvider } from "../../core/payments/payment.types.js";
 import { gatewayDisabledError } from "../../core/shared/errors/PaymentError.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
-import { PaymentMethodConfig, PaymentTransaction, Plan, Subscription, Workspace } from "../../models/index.js";
+import { PaymentTransaction, Plan, Subscription, Workspace } from "../../models/index.js";
+import { getEffectivePaymentMethodConfig, resolveWorkspaceForPayment } from "./paymentMethodConfig.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 
 export interface SubscriptionInput {
@@ -14,6 +15,7 @@ export interface SubscriptionInput {
     email?: string;
     name?: string;
     payerFields?: Record<string, string>;
+    workspaceSlug?: string;
 }
 
 export const subscribeToPlan = async (input: SubscriptionInput, user?: AuthenticatedUserContext) => {
@@ -28,24 +30,23 @@ export const subscribeToPlan = async (input: SubscriptionInput, user?: Authentic
     const billingCycle = input.billingCycle === "yearly" ? "yearly" : "monthly";
     const plan = await Plan.findOne({ code: planCode, status: "published", visibility: "public" }).exec();
     if (!plan) throw notFoundError("Published plan not found.");
-    if (user && (!user.workspaceId || user.role === "super_admin")) {
-        throw unprocessableEntityError("A customer workspace is required to start a subscription.");
-    }
+    const subscriptionWorkspaceId = user ? await resolveWorkspaceForPayment(user, input.workspaceSlug) : undefined;
+    if (user && (!subscriptionWorkspaceId || user.role === "super_admin")) throw unprocessableEntityError("A customer workspace is required to start a subscription.");
     const price = plan.pricing[billingCycle];
     if (price == null || price <= 0) throw unprocessableEntityError(`The ${billingCycle} price is not configured for this plan.`);
     if (plan.allowedProviders.length && !plan.allowedProviders.includes(provider)) {
         throw unprocessableEntityError("This payment method is not available for the selected plan.");
     }
 
-    const method = await PaymentMethodConfig.findOne({ provider, isEnabled: true }).exec();
-    if (!method) throw gatewayDisabledError(provider);
+    const method = await getEffectivePaymentMethodConfig(provider, subscriptionWorkspaceId);
+    if (!method?.isEnabled) throw gatewayDisabledError(provider);
     const descriptor = PaymentGatewayFactory.getProvider(provider).descriptor();
     const currency = plan.currency.toUpperCase();
     if (!method.supportedCurrencies.includes(currency) || !descriptor.supportedCurrencies.includes(currency)) {
         throw unprocessableEntityError(`${method.label} does not support ${currency} for this plan.`);
     }
 
-    const settings = Object.fromEntries(method.settings);
+    const settings = method.settings;
     let amount = price;
     if (provider === "vodafone_cash") {
         const feePercent = Number(settings.feePercent || 0);
@@ -58,7 +59,7 @@ export const subscribeToPlan = async (input: SubscriptionInput, user?: Authentic
         label: method.label,
         isEnabled: method.isEnabled,
         isTestMode: method.isTestMode,
-        credentials: Object.fromEntries(method.credentials),
+        credentials: method.credentials,
         settings,
         payerFields: method.payerFields,
         supportedCurrencies: method.supportedCurrencies,
@@ -74,7 +75,7 @@ export const subscribeToPlan = async (input: SubscriptionInput, user?: Authentic
         reference,
         payer: {
             id: user?.id,
-            workspaceId: user?.workspaceId,
+            workspaceId: subscriptionWorkspaceId,
             email: input.email?.trim() || user?.email,
             name: input.name?.trim() || user?.name,
         },
@@ -86,7 +87,7 @@ export const subscribeToPlan = async (input: SubscriptionInput, user?: Authentic
 
     await PaymentTransaction.create({
         reference,
-        ...(user ? { userId: user.id, workspaceId: user.workspaceId } : {}),
+        ...(user ? { userId: user.id, workspaceId: subscriptionWorkspaceId } : {}),
         planId: plan._id,
         planCode: plan.code,
         provider,

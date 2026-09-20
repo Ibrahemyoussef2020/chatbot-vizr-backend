@@ -4,7 +4,7 @@ import { authenticate } from "../middlewares/index.js";
 
 const subscriptionRouter = Router();
 
-subscriptionRouter.get("/methods", checkoutMethods);
+subscriptionRouter.get("/methods", authenticate, checkoutMethods);
 subscriptionRouter.post("/subscribe", subscribe);
 subscriptionRouter.post("/onboarding/subscribe", authenticate, subscribe);
 subscriptionRouter.post("/onboarding/free-plan", authenticate, startFreePlan);

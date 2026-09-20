@@ -47,9 +47,9 @@ export class StripePaymentGateway implements IPaymentGateway {
             mode: "redirect",
             description: "Card, wallet, and bank payments through Stripe Checkout, settled automatically over webhooks.",
             credentialFields: [
-                { key: "secretKey", label: "Secret key", type: "password", required: true, secret: true, placeholder: "sk_test_…", helpText: "Stripe dashboard → Developers → API keys." },
-                { key: "publishableKey", label: "Publishable key", type: "text", required: false, placeholder: "pk_test_…" },
-                { key: "webhookSecret", label: "Webhook signing secret", type: "password", required: true, secret: true, placeholder: "whsec_…", helpText: "From the endpoint you point at /api/webhooks/stripe." },
+                { key: "secretKey", label: "Secret key", type: "password", required: true, secret: true, environmentKey: "STRIPE_SECRET_KEY", placeholder: "sk_test_…", helpText: "Stripe Dashboard → Developers → API keys." },
+                { key: "publishableKey", label: "Publishable key", type: "text", required: false, environmentKey: "STRIPE_PUBLISHABLE_KEY", placeholder: "pk_test_…", helpText: "Optional for the current hosted Checkout flow." },
+                { key: "webhookSecret", label: "Webhook signing secret", type: "password", required: true, secret: true, environmentKey: "STRIPE_WEBHOOK_SECRET", placeholder: "whsec_…", helpText: "From the Stripe webhook destination at /api/webhooks/stripe." },
             ],
             settingFields: [
                 { key: "statementDescriptor", label: "Statement descriptor", type: "text", required: false, placeholder: "VIZR AI", helpText: "Shown on the payer's bank statement (max 22 characters)." },
@@ -98,9 +98,18 @@ export class StripePaymentGateway implements IPaymentGateway {
                         },
                     },
                 ],
-                payment_intent_data: typeof settings.statementDescriptor === "string" && settings.statementDescriptor
-                    ? { statement_descriptor: String(settings.statementDescriptor).slice(0, 22) }
-                    : undefined,
+                payment_intent_data: {
+                    ...(typeof settings.statementDescriptor === "string" && settings.statementDescriptor
+                        ? { statement_descriptor: String(settings.statementDescriptor).slice(0, 22) }
+                        : {}),
+                    metadata: {
+                        reference,
+                        planCode: plan.code,
+                        billingCycle,
+                        workspaceId: payer.workspaceId || "",
+                        userId: payer.id || "",
+                    },
+                },
                 metadata: {
                     reference,
                     planId: plan.id,
@@ -177,6 +186,7 @@ export class StripePaymentGateway implements IPaymentGateway {
                     : undefined,
                 currency: session.currency?.toUpperCase(),
                 providerCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
+                paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
                 providerSubscriptionId: typeof session.subscription === "string"
                     ? session.subscription
                     : session.subscription?.id,

@@ -10,6 +10,7 @@ const handleSubscribe = async (req: Request, res: Response) => {
     const email = req.body.email;
     const name = req.body.name;
     const payerFields = req.body.payerFields;
+    const workspaceSlug = req.body.system_slug;
 
     const result = await executeSubscribe({
         planCode,
@@ -18,6 +19,7 @@ const handleSubscribe = async (req: Request, res: Response) => {
         email,
         name,
         payerFields,
+        workspaceSlug,
     }, res.locals.user);
 
     res.status(200).json(result);
@@ -25,8 +27,9 @@ const handleSubscribe = async (req: Request, res: Response) => {
 
 export const subscribe = asyncHandler(handleSubscribe);
 
-const handleCheckoutMethods = async (_req: Request, res: Response) => {
-    res.status(200).json({ success: true, data: await listCheckoutPaymentMethods() });
+const handleCheckoutMethods = async (req: Request, res: Response) => {
+    const workspaceSlug = typeof req.query.system_slug === "string" ? req.query.system_slug : undefined;
+    res.status(200).json({ success: true, data: await listCheckoutPaymentMethods(res.locals.user, workspaceSlug) });
 };
 export const checkoutMethods = asyncHandler(handleCheckoutMethods);
 

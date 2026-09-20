@@ -3,19 +3,31 @@ import "../../core/payments/payment.strategies.js";
 import { PaymentGatewayFactory } from "../../core/payments/payment-gateway.factory.js";
 import type { GatewayConfig } from "../../core/payments/payment.types.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
-import { PaymentMethodConfig, PaymentTransaction, Subscription } from "../../models/index.js";
+import { PaymentTransaction, Subscription } from "../../models/index.js";
+import { getEffectivePaymentMethodConfig } from "./paymentMethodConfig.js";
 
 export const handleStripeWebhook = async (rawBody: Buffer, headers: IncomingHttpHeaders) => {
-    const method = await PaymentMethodConfig.findOne({ provider: "stripe", isEnabled: true }).exec();
-    if (!method) throw notFoundError("Stripe payments are not enabled.");
+    let rawEvent: Record<string, any> = {};
+    try { rawEvent = JSON.parse(rawBody.toString("utf8")); } catch { /* Signature verification below reports invalid input. */ }
+    const object = rawEvent.data?.object || {};
+    const paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id;
+    const reference = object.metadata?.reference || object.client_reference_id;
+    let transaction = reference
+        ? await PaymentTransaction.findOne({ provider: "stripe", reference }).exec()
+        : null;
+    if (!transaction && object.id) transaction = await PaymentTransaction.findOne({ provider: "stripe", providerRef: object.id }).exec();
+    if (!transaction && paymentIntentId) transaction = await PaymentTransaction.findOne({ provider: "stripe", paymentIntentId }).exec();
+    const workspaceId = transaction?.workspaceId ? String(transaction.workspaceId) : object.metadata?.workspaceId;
+    const method = await getEffectivePaymentMethodConfig("stripe", workspaceId);
+    if (!method) throw notFoundError("Stripe payments are not configured for this workspace.");
 
     const config: GatewayConfig = {
         provider: "stripe",
         label: method.label,
         isEnabled: method.isEnabled,
         isTestMode: method.isTestMode,
-        credentials: Object.fromEntries(method.credentials),
-        settings: Object.fromEntries(method.settings),
+        credentials: method.credentials,
+        settings: method.settings,
         payerFields: method.payerFields,
         supportedCurrencies: method.supportedCurrencies,
         instructions: method.instructions,
@@ -24,7 +36,9 @@ export const handleStripeWebhook = async (rawBody: Buffer, headers: IncomingHttp
     if (!event) throw unprocessableEntityError("Stripe webhook verification is unavailable.");
     if (!event.providerRef || event.status === "ignored") return { received: true, ignored: true };
 
-    const transaction = await PaymentTransaction.findOne({ provider: "stripe", providerRef: event.providerRef }).exec();
+    transaction ||= await PaymentTransaction.findOne({ provider: "stripe", providerRef: event.providerRef }).exec();
+    if (!transaction && event.paymentIntentId) transaction = await PaymentTransaction.findOne({ provider: "stripe", paymentIntentId: event.paymentIntentId }).exec();
+    if (!transaction && event.status === "refunded") transaction = await PaymentTransaction.findOne({ provider: "stripe", paymentIntentId: event.providerRef }).exec();
     if (!transaction) throw notFoundError("No payment matches this Stripe checkout session.");
     if (event.amount !== undefined && Math.abs(event.amount - transaction.amount) > 0.01) {
         throw unprocessableEntityError("Stripe payment amount does not match the checkout transaction.");
@@ -38,6 +52,7 @@ export const handleStripeWebhook = async (rawBody: Buffer, headers: IncomingHttp
         ? event.status
         : transaction.status;
     transaction.providerRef = event.providerRef;
+    transaction.paymentIntentId = event.paymentIntentId || transaction.paymentIntentId;
     transaction.failureReason = event.failureReason || transaction.failureReason;
     transaction.rawEvent = event.raw;
     await transaction.save();

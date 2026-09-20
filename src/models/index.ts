@@ -32,6 +32,7 @@ import AIAgent from "./AIAgent.js";
 import AIRequestLog from "./AIRequestLog.js";
 import AIRoutingPolicy from "./AIRoutingPolicy.js";
 import AIQuotaPolicy from "./AIQuotaPolicy.js";
+import WorkspacePaymentMethodConfig from "./WorkspacePaymentMethodConfig.js";
 
 export {
     User,
@@ -68,4 +69,5 @@ export {
     AIRequestLog,
     AIRoutingPolicy,
     AIQuotaPolicy,
+    WorkspacePaymentMethodConfig,
 };

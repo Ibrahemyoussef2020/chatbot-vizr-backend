@@ -23,6 +23,7 @@ export interface IPaymentTransaction extends Document {
     currency: string;
     status: TransactionStatus;
     providerRef?: string;
+    paymentIntentId?: string;
     payerFields: Map<string, string>;
     payerEmail?: string;
     payerName?: string;
@@ -54,6 +55,7 @@ const PaymentTransactionSchema = new Schema<IPaymentTransaction>(
             index: true,
         },
         providerRef: { type: String, default: null, trim: true, index: { unique: true, sparse: true } },
+        paymentIntentId: { type: String, default: "", trim: true, index: true },
         payerFields: { type: Map, of: String, default: () => new Map<string, string>() },
         payerEmail: { type: String, default: "", trim: true, lowercase: true },
         payerName: { type: String, default: "", trim: true },
