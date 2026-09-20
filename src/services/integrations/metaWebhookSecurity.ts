@@ -1,20 +1,15 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { MetaChannelConfig, WhatsAppConfig } from "../../models/index.js";
+import { MetaChannelConfig } from "../../models/index.js";
+import { resolveWhatsAppPhoneConfig } from "./whatsappRouting.js";
 const configuredSecrets = async (body: any): Promise<string[]> => {
     if (body?.object === "whatsapp_business_account") {
-        // A physical WhatsApp number may be linked to several workspaces. Try
-        // every configured secret for the phone IDs in the event instead of
-        // silently trusting whichever workspace was created first.
-        const phoneIds = [...new Set((body.entry || []).flatMap((entry: any) =>
-            (entry.changes || [])
-                .map((change: any) => String(change?.value?.metadata?.phone_number_id || "").trim())
-                .filter(Boolean),
-        ))];
-        const configs = phoneIds.length
-            ? await WhatsAppConfig.find({ whatsapp_phone_number_id: { $in: phoneIds } } as any).select("whatsapp_app_secret").lean().exec()
-            : [];
+        const phoneNumberId = body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
+        const config = await resolveWhatsAppPhoneConfig(phoneNumberId);
+        // Keep tenant credentials isolated. The shared environment secret is
+        // only a fallback for this workspace when it has no App Secret saved.
+        const workspaceSecret = config?.whatsapp_app_secret?.trim();
+        if (workspaceSecret) return [workspaceSecret];
         return [
-            ...configs.map((config: any) => config.whatsapp_app_secret),
             process.env.WHATSAPP_APP_SECRET,
             process.env.META_APP_SECRET,
         ].map((secret) => String(secret || "").trim()).filter(Boolean);
