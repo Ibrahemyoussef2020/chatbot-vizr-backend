@@ -32,7 +32,9 @@ export const getEffectivePaymentMethodConfig = async (provider: string, workspac
         workspaceId: undefined,
         credentials: storedGlobalCredentials,
         workspaceCredentialKeys: [],
-        globalCredentialKeys: Object.keys(storedGlobalCredentials),
+        globalCredentialKeys: Object.entries(storedGlobalCredentials)
+            .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+            .map(([key]) => key),
         settings: record(selected.settings),
         payerFields: selected.payerFields || [],
         isWorkspaceOverride: false,

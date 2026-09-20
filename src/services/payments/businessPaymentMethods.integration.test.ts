@@ -24,16 +24,17 @@ test("method configuration uses registered providers and hides credentials", asy
         assert.equal(saved?.isEnabled, true);
         const savedFromDifferentWorkspace = await saveBusinessPaymentMethod(otherWorkspaceUser, "vodafone_cash", { ...input, label: "Shared wallet" }, "not-owned-workspace");
         assert.equal(savedFromDifferentWorkspace?.label, "Shared wallet");
-        await PaymentMethodConfig.create({
-            provider: "stripe",
+        const savedStripe = await saveBusinessPaymentMethod(user, "stripe", {
             label: "Stripe",
             isEnabled: true,
             isTestMode: true,
             sortOrder: 0,
-            credentials: { secretKey: "sk_test_owner_value", publishableKey: "pk_test_owner_value", webhookSecret: "whsec_owner_value" },
-            settings: {},
+            instructions: "",
             supportedCurrencies: ["USD"],
+            settings: {},
+            credentials: { secretKey: "sk_test_owner_value", publishableKey: "pk_test_owner_value", webhookSecret: "whsec_owner_value" },
         });
+        assert.equal(savedStripe?.credentials.secretKey, "sk_test_owner_value");
         const workspaceId = new mongoose.Types.ObjectId();
         await WorkspacePaymentMethodConfig.create({
             workspaceId,
@@ -58,6 +59,10 @@ test("method configuration uses registered providers and hides credentials", asy
         assert.equal(stripe?.credentials.publishableKey, "pk_test_owner_value");
         assert.equal(stripe?.credentials.webhookSecret, "whsec_owner_value");
         assert.equal(JSON.stringify(checkoutMethods).includes("sk_test_owner_value"), false);
+        await PaymentMethodConfig.updateOne({ provider: "stripe" }, { $set: { "credentials.webhookSecret": "" } });
+        const stripeWithEmptyCredential = (await listBusinessPaymentMethods(user)).find(method => method.provider === "stripe");
+        assert.notEqual(stripeWithEmptyCredential?.credentialStatus.webhookSecret, "global");
+        assert.equal(stripeWithEmptyCredential?.credentials.webhookSecret, undefined);
         assert.equal(JSON.stringify(methods).includes("hidden"), false);
         await saveBusinessPaymentMethod(user, "vodafone_cash", { ...input, isEnabled: false });
         assert.equal(await PaymentMethodConfig.countDocuments({ provider: "vodafone_cash" }), 1);
