@@ -38,6 +38,27 @@ export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext)
     });
 };
 
+/** Safe checkout options for signed-in customers. Never returns gateway credentials. */
+export const listCheckoutPaymentMethods = async () => {
+    const configs = await PaymentMethodConfig.find({ isEnabled: true }).lean().exec();
+    return PaymentGatewayFactory.listDescriptors().flatMap(descriptor => {
+        const config = configs.find(item => item.provider === descriptor.provider);
+        if (!config) return [];
+        return [{
+            provider: descriptor.provider,
+            label: config.label || descriptor.label,
+            description: descriptor.description,
+            mode: descriptor.mode,
+            isTestMode: config.isTestMode,
+            supportedCurrencies: config.supportedCurrencies,
+            instructions: config.instructions || "",
+            payerFields: (config.payerFields?.length ? config.payerFields : descriptor.defaultPayerFields)
+                .filter(field => field.type !== "file")
+                .map(field => ({ key: field.key, label: field.label, type: field.type, required: field.required, placeholder: field.placeholder || "", helpText: field.helpText || "" })),
+        }];
+    }).sort((a, b) => a.provider.localeCompare(b.provider));
+};
+
 export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, provider: string, input: unknown) => {
     authorizeBusinessPayment(user, "payment_methods.manage");
     if (!PaymentGatewayFactory.hasProvider(provider)) throw notFoundError("Payment provider not found.");
@@ -72,6 +93,9 @@ export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, 
             if (!(credentials.webhookSecret || process.env.STRIPE_WEBHOOK_SECRET)) {
                 throw unprocessableEntityError("Configure the Stripe webhook secret before enabling this method.");
             }
+        }
+        if (provider === "vodafone_cash" && !data.isTestMode && data.supportedCurrencies.includes("USD")) {
+            throw unprocessableEntityError("Live Vodafone Cash transfers accept EGP only. USD is available only in test mode.");
         }
         const min = data.settings.minAmount;
         const max = data.settings.maxAmount;

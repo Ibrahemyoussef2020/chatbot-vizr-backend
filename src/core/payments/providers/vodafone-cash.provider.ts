@@ -32,8 +32,8 @@ export class VodafoneCashPaymentGateway implements IPaymentGateway {
             description: "Wallet-to-wallet transfer. The payer sends the amount and submits a reference, then the business owner approves it.",
             credentialFields: [],
             settingFields: [
-                { key: "walletNumber", label: "Receiving wallet number", type: "tel", required: true, placeholder: "01012345678", helpText: "The Vodafone Cash number payers transfer to." },
-                { key: "holderName", label: "Wallet holder name", type: "text", required: true, placeholder: "Vizr AI" },
+                { key: "walletNumber", label: "Receiving wallet number", type: "tel", required: false, placeholder: "01012345678", helpText: "Required only for live payments. Test mode simulates a transfer." },
+                { key: "holderName", label: "Wallet holder name", type: "text", required: false, placeholder: "Vizr AI", helpText: "Required only for live payments." },
                 { key: "minAmount", label: "Minimum amount", type: "number", required: false, min: 0, helpText: "Reject transfers below this amount. Leave blank for no floor." },
                 { key: "maxAmount", label: "Maximum amount", type: "number", required: false, min: 0, helpText: "Reject transfers above this amount. Leave blank for no ceiling." },
                 { key: "feePercent", label: "Transfer fee (%)", type: "number", required: false, min: 0, max: 100, helpText: "Added to the plan price at checkout." },
@@ -53,6 +53,7 @@ export class VodafoneCashPaymentGateway implements IPaymentGateway {
     }
 
     validateConfig(config: GatewayConfig): void {
+        if (config.isTestMode) return;
         const wallet = String(setting(config, "walletNumber") || "").replace(/[\s-]/g, "");
         if (!wallet) {
             throw gatewayNotConfiguredError("vodafone_cash", "A receiving Vodafone Cash wallet number is required.");
@@ -69,6 +70,20 @@ export class VodafoneCashPaymentGateway implements IPaymentGateway {
         const { config, amount, currency, reference, plan, billingCycle } = context;
         this.validateConfig(config);
 
+        const payerFields = this.collectPayerFields(context);
+        if (config.isTestMode) {
+            return {
+                mode: "manual",
+                status: "awaiting_review",
+                instructions: [
+                    "Vodafone Cash test mode: this is a simulated payment. Do not transfer real money.",
+                    `Test amount: ${amount.toFixed(2)} ${currency} for ${plan.name} (${billingCycle}).`,
+                    `Test reference: ${reference}. The payment will remain pending until the business owner reviews it.`,
+                ].join("\n"),
+                payerFields,
+            };
+        }
+
         const min = numericSetting(config, "minAmount");
         const max = numericSetting(config, "maxAmount");
         if (min != null && amount < min) {
@@ -78,7 +93,6 @@ export class VodafoneCashPaymentGateway implements IPaymentGateway {
             throw unprocessableEntityError(`Vodafone Cash transfers may not exceed ${max} ${currency}. Please choose another payment method.`);
         }
 
-        const payerFields = this.collectPayerFields(context);
         const wallet = String(setting(config, "walletNumber"));
         const holder = String(setting(config, "holderName"));
         const slaHours = numericSetting(config, "reviewSlaHours") ?? 24;
@@ -115,6 +129,7 @@ export class VodafoneCashPaymentGateway implements IPaymentGateway {
     }
 
     async healthCheck(config: GatewayConfig): Promise<HealthCheckResult> {
+        if (config.isTestMode) return { ok: true, detail: "Vodafone Cash simulation is ready. No real wallet transfer will be made." };
         try {
             this.validateConfig(config);
             return {

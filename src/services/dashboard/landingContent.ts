@@ -3,6 +3,7 @@ import LandingPage from "../../models/LandingPage.js";
 import Plan from "../../models/Plan.js";
 import PlanFeature from "../../models/PlanFeature.js";
 import { featureOptions } from "../plans/businessFeatures.js";
+import { entitlementRegistry, quotaRegistry } from "../../core/plans/quota.registry.js";
 
 const aboutComparisonSection = { type: "comparison", eyebrow: "Purpose-built business AI", heading: "Generic AI knows the web. Vizr knows your business.", description: "Public general-purpose answers are different from an operational assistant grounded in current private data.", items: [
     { label: "Generic AI", title: "Public-data guessing", description: "May invent prices, policies or product details that your business does not offer.", status: "negative" },
@@ -144,13 +145,14 @@ export const getLandingPage = async (slug: string) => {
         // Keep the public pricing page in sync so onboarding cannot submit stale CMS plans.
         const plans = await Plan.find({ status: "published", visibility: "public" })
             .sort({ sortOrder: 1, createdAt: 1 })
-            .select("code name description eyebrow popular currency pricing ctaLabel ctaPath features featureIds")
+            .select("code name description eyebrow popular currency pricing ctaLabel ctaPath features featureIds quotas entitlements")
             .lean()
             .exec();
         if (plans.length) {
             const bundleIds = [...new Set(plans.flatMap(plan => (plan.featureIds || []).map(id => String(id))))];
             const bundles = await PlanFeature.find({ _id: { $in: bundleIds } }).lean().exec();
             const options = await featureOptions({ permissions: ["plans.manage"] } as never);
+            const displayMetrics = quotaRegistry.filter(metric => metric.unit !== "days");
             const planSection = page.sections.find((section: { type?: string }) => section.type === "plans");
             if (planSection) {
                 planSection.items = plans.map(plan => ({
@@ -169,7 +171,9 @@ export const getLandingPage = async (slug: string) => {
                         const bundle = bundles.find(item => String(item._id) === String(id));
                         return bundle ? [{ name: bundle.name, description: bundle.description || "", quotas: bundle.quotas || {}, agentSlugs: bundle.agentSlugs || [] }] : [];
                     }),
-                    featureOptions: options,
+                    featureOptions: { ...options, metrics: displayMetrics, entitlements: entitlementRegistry },
+                    entitlements: plan.entitlements || {},
+                    quotas: plan.quotas instanceof Map ? Object.fromEntries(plan.quotas) : plan.quotas || {},
                 }));
             }
         }

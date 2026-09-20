@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 import { getWorkspaceSubscriptionStatus, startFreeSubscription as executeFreeSubscription, subscribeToPlan as executeSubscribe } from "../services/payments/subscription.js";
+import { listCheckoutPaymentMethods } from "../services/payments/businessPaymentMethods.js";
 
 const handleSubscribe = async (req: Request, res: Response) => {
     const planCode = req.body.planCode;
@@ -23,6 +24,11 @@ const handleSubscribe = async (req: Request, res: Response) => {
 };
 
 export const subscribe = asyncHandler(handleSubscribe);
+
+const handleCheckoutMethods = async (_req: Request, res: Response) => {
+    res.status(200).json({ success: true, data: await listCheckoutPaymentMethods() });
+};
+export const checkoutMethods = asyncHandler(handleCheckoutMethods);
 
 const handleFreePlan = async (req: Request, res: Response) => {
     const result = await executeFreeSubscription(

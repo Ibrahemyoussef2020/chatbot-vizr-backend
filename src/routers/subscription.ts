@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { startFreePlan, subscribe, subscriptionStatus } from "../controllers/subscription.js";
+import { checkoutMethods, startFreePlan, subscribe, subscriptionStatus } from "../controllers/subscription.js";
 import { authenticate } from "../middlewares/index.js";
 
 const subscriptionRouter = Router();
 
+subscriptionRouter.get("/methods", checkoutMethods);
 subscriptionRouter.post("/subscribe", subscribe);
 subscriptionRouter.post("/onboarding/subscribe", authenticate, subscribe);
 subscriptionRouter.post("/onboarding/free-plan", authenticate, startFreePlan);
