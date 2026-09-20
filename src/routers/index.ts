@@ -5,6 +5,8 @@ import userRouter from "./user.js";
 import landingRouter from "./landing.js";
 import workspaceRouter from "./workspace.js";
 import subscriptionRouter from "./subscription.js";
+import * as businessPaymentMethods from "../controllers/businessPaymentMethods.js";
+import { authenticate } from "../middlewares/index.js";
 import { whatsappWebhookController, telegramBotController, gmailController, publicChatController, instagramWebhookController, channelRecoveryController } from "../controllers/index.js";
 import { publicRateLimit } from "../middlewares/publicRateLimit.middleware.js";
 import { stripeWebhook } from "../controllers/stripeWebhook.js";
@@ -42,5 +44,7 @@ appRouter.use("/chat", chatsRouter);
 
 appRouter.use("/admin", workspaceRouter);
 appRouter.use("/subscription", subscriptionRouter);
+appRouter.get("/platform/payment-methods", authenticate, businessPaymentMethods.index);
+appRouter.put("/platform/payment-methods/:provider", authenticate, businessPaymentMethods.update);
 
 export default appRouter;
