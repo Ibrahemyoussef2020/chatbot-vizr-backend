@@ -1,5 +1,17 @@
 import { body } from "express-validator";
 
+const workspaceProfileValidators = [
+    body("business_name").optional({ values: "falsy" }).trim().isLength({ max: 255 }).withMessage("Business name must be 255 characters or fewer"),
+    body("industry").optional({ values: "falsy" }).trim().isLength({ max: 120 }).withMessage("Industry must be 120 characters or fewer"),
+    body("website_url").optional({ values: "falsy" }).trim().isURL({ require_protocol: true }).withMessage("Website must be a valid URL including https://"),
+    body("support_email").optional({ values: "falsy" }).trim().isEmail().withMessage("Support email must be valid"),
+    body("support_phone").optional({ values: "falsy" }).trim().isLength({ max: 40 }).withMessage("Support phone must be 40 characters or fewer"),
+    body("country").optional({ values: "falsy" }).trim().isLength({ max: 120 }).withMessage("Country must be 120 characters or fewer"),
+    body("timezone").optional({ values: "falsy" }).trim().isLength({ max: 100 }).withMessage("Timezone must be 100 characters or fewer"),
+    body("default_language").optional({ values: "falsy" }).trim().matches(/^[a-z]{2}(-[A-Z]{2})?$/i).withMessage("Language must look like en or ar-EG"),
+    body("currency").optional({ values: "falsy" }).trim().matches(/^[A-Z]{3}$/i).withMessage("Currency must be a 3-letter code"),
+];
+
 export const createWorkspaceValidator = [
     body("name")
         .trim()
@@ -11,6 +23,7 @@ export const createWorkspaceValidator = [
         .optional()
         .isInt({ min: 1, max: 1000 })
         .withMessage("Rate limit must be between 1 and 1000"),
+    ...workspaceProfileValidators,
 ];
 
 export const updateWorkspaceValidator = [
@@ -29,4 +42,5 @@ export const updateWorkspaceValidator = [
         .optional()
         .isInt({ min: 1, max: 1000 })
         .withMessage("Rate limit must be between 1 and 1000"),
+    ...workspaceProfileValidators,
 ];

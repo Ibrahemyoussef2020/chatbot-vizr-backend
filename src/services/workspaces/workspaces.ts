@@ -73,6 +73,15 @@ const serialize = (workspace: {
     _id: unknown;
     name: string;
     slug: string;
+    businessName?: string;
+    industry?: string;
+    websiteUrl?: string;
+    supportEmail?: string;
+    supportPhone?: string;
+    country?: string;
+    timezone?: string;
+    defaultLanguage?: string;
+    currency?: string;
     isActive: boolean;
     rateLimit: number;
     createdAt?: Date;
@@ -81,6 +90,15 @@ const serialize = (workspace: {
     id: workspace._id,
     name: workspace.name,
     slug: workspace.slug,
+    business_name: workspace.businessName || "",
+    industry: workspace.industry || "",
+    website_url: workspace.websiteUrl || "",
+    support_email: workspace.supportEmail || "",
+    support_phone: workspace.supportPhone || "",
+    country: workspace.country || "",
+    timezone: workspace.timezone || "UTC",
+    default_language: workspace.defaultLanguage || "en",
+    currency: workspace.currency || "USD",
     is_active: workspace.isActive,
     rate_limit: workspace.rateLimit,
     created_at: workspace.createdAt,
@@ -95,7 +113,19 @@ export const listWorkspaces = async (user: AuthenticatedUserContext) => {
 
 export const createWorkspace = async (
     user: AuthenticatedUserContext,
-    input: { name: string; rate_limit?: number },
+    input: {
+        name: string;
+        business_name?: string;
+        industry?: string;
+        website_url?: string;
+        support_email?: string;
+        support_phone?: string;
+        country?: string;
+        timezone?: string;
+        default_language?: string;
+        currency?: string;
+        rate_limit?: number;
+    },
 ) => {
     if (user.role !== "super_admin") {
         throw forbiddenError("Only a global administrator can create workspaces");
@@ -104,6 +134,15 @@ export const createWorkspace = async (
     const workspace = await Workspace.create({
         name: input.name.trim(),
         slug: await uniqueSlug(input.name),
+        businessName: input.business_name?.trim() || "",
+        industry: input.industry?.trim() || "",
+        websiteUrl: input.website_url?.trim() || "",
+        supportEmail: input.support_email?.trim().toLowerCase() || "",
+        supportPhone: input.support_phone?.trim() || "",
+        country: input.country?.trim() || "",
+        timezone: input.timezone?.trim() || "UTC",
+        defaultLanguage: input.default_language?.trim().toLowerCase() || "en",
+        currency: input.currency?.trim().toUpperCase() || "USD",
         ownerId: user.id,
         rateLimit: input.rate_limit ?? 60,
         isActive: true,
@@ -128,12 +167,34 @@ export const getWorkspace = async (user: AuthenticatedUserContext, identifier: s
 export const updateWorkspace = async (
     user: AuthenticatedUserContext,
     identifier: string,
-    input: { name?: string; is_active?: boolean; rate_limit?: number },
+    input: {
+        name?: string;
+        business_name?: string;
+        industry?: string;
+        website_url?: string;
+        support_email?: string;
+        support_phone?: string;
+        country?: string;
+        timezone?: string;
+        default_language?: string;
+        currency?: string;
+        is_active?: boolean;
+        rate_limit?: number;
+    },
 ) => {
     const workspace = await getWorkspace(user, identifier);
-    const changes: { name?: string; isActive?: boolean; rateLimit?: number } = {};
+    const changes: Record<string, unknown> = {};
 
     if (input.name !== undefined) changes.name = input.name.trim();
+    if (input.business_name !== undefined) changes.businessName = input.business_name.trim();
+    if (input.industry !== undefined) changes.industry = input.industry.trim();
+    if (input.website_url !== undefined) changes.websiteUrl = input.website_url.trim();
+    if (input.support_email !== undefined) changes.supportEmail = input.support_email.trim().toLowerCase();
+    if (input.support_phone !== undefined) changes.supportPhone = input.support_phone.trim();
+    if (input.country !== undefined) changes.country = input.country.trim();
+    if (input.timezone !== undefined) changes.timezone = input.timezone.trim();
+    if (input.default_language !== undefined) changes.defaultLanguage = input.default_language.trim().toLowerCase();
+    if (input.currency !== undefined) changes.currency = input.currency.trim().toUpperCase();
     if (input.is_active !== undefined) changes.isActive = input.is_active;
     if (input.rate_limit !== undefined) changes.rateLimit = input.rate_limit;
     if (!Object.keys(changes).length) throw unprocessableEntityError("No workspace changes were supplied");
