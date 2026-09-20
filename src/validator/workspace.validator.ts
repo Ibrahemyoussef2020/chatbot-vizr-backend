@@ -8,7 +8,6 @@ const workspaceProfileValidators = [
     body("support_phone").optional({ values: "falsy" }).trim().isLength({ max: 40 }).withMessage("Support phone must be 40 characters or fewer"),
     body("country").optional({ values: "falsy" }).trim().isLength({ max: 120 }).withMessage("Country must be 120 characters or fewer"),
     body("timezone").optional({ values: "falsy" }).trim().isLength({ max: 100 }).withMessage("Timezone must be 100 characters or fewer"),
-    body("default_language").optional({ values: "falsy" }).trim().matches(/^[a-z]{2}(-[A-Z]{2})?$/i).withMessage("Language must look like en or ar-EG"),
     body("currency").optional({ values: "falsy" }).trim().matches(/^[A-Z]{3}$/i).withMessage("Currency must be a 3-letter code"),
 ];
 

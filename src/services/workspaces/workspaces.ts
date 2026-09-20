@@ -80,7 +80,6 @@ const serialize = (workspace: {
     supportPhone?: string;
     country?: string;
     timezone?: string;
-    defaultLanguage?: string;
     currency?: string;
     isActive: boolean;
     rateLimit: number;
@@ -97,7 +96,6 @@ const serialize = (workspace: {
     support_phone: workspace.supportPhone || "",
     country: workspace.country || "",
     timezone: workspace.timezone || "UTC",
-    default_language: workspace.defaultLanguage || "en",
     currency: workspace.currency || "USD",
     is_active: workspace.isActive,
     rate_limit: workspace.rateLimit,
@@ -122,7 +120,6 @@ export const createWorkspace = async (
         support_phone?: string;
         country?: string;
         timezone?: string;
-        default_language?: string;
         currency?: string;
         rate_limit?: number;
     },
@@ -141,7 +138,6 @@ export const createWorkspace = async (
         supportPhone: input.support_phone?.trim() || "",
         country: input.country?.trim() || "",
         timezone: input.timezone?.trim() || "UTC",
-        defaultLanguage: input.default_language?.trim().toLowerCase() || "en",
         currency: input.currency?.trim().toUpperCase() || "USD",
         ownerId: user.id,
         rateLimit: input.rate_limit ?? 60,
@@ -176,7 +172,6 @@ export const updateWorkspace = async (
         support_phone?: string;
         country?: string;
         timezone?: string;
-        default_language?: string;
         currency?: string;
         is_active?: boolean;
         rate_limit?: number;
@@ -193,7 +188,6 @@ export const updateWorkspace = async (
     if (input.support_phone !== undefined) changes.supportPhone = input.support_phone.trim();
     if (input.country !== undefined) changes.country = input.country.trim();
     if (input.timezone !== undefined) changes.timezone = input.timezone.trim();
-    if (input.default_language !== undefined) changes.defaultLanguage = input.default_language.trim().toLowerCase();
     if (input.currency !== undefined) changes.currency = input.currency.trim().toUpperCase();
     if (input.is_active !== undefined) changes.isActive = input.is_active;
     if (input.rate_limit !== undefined) changes.rateLimit = input.rate_limit;

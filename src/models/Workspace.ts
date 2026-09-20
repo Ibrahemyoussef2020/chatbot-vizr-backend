@@ -10,7 +10,6 @@ export interface IWorkspace extends Document {
     supportPhone: string;
     country: string;
     timezone: string;
-    defaultLanguage: string;
     currency: string;
     ownerId: Types.ObjectId;
     isActive: boolean;
@@ -31,7 +30,6 @@ const WorkspaceSchema = new Schema<IWorkspace>(
         supportPhone: { type: String, default: "", trim: true, maxlength: 40 },
         country: { type: String, default: "", trim: true, maxlength: 120 },
         timezone: { type: String, default: "UTC", trim: true, maxlength: 100 },
-        defaultLanguage: { type: String, default: "en", trim: true, lowercase: true, maxlength: 12 },
         currency: { type: String, default: "USD", trim: true, uppercase: true, minlength: 3, maxlength: 3 },
         ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
         isActive: { type: Boolean, default: true, index: true },
