@@ -1,5 +1,6 @@
 import { notFoundError } from "../../core/shared/errors/HttpError.js";
 import LandingPage from "../../models/LandingPage.js";
+import Plan from "../../models/Plan.js";
 
 const aboutComparisonSection = { type: "comparison", eyebrow: "Purpose-built business AI", heading: "Generic AI knows the web. Vizr knows your business.", description: "Public general-purpose answers are different from an operational assistant grounded in current private data.", items: [
     { label: "Generic AI", title: "Public-data guessing", description: "May invent prices, policies or product details that your business does not offer.", status: "negative" },
@@ -134,6 +135,34 @@ export const getLandingPage = async (slug: string) => {
     let page = await LandingPage.findOne({ slug }).lean();
     if (!page || (page.contentVersion || 0) < initial.contentVersion) {
         page = await LandingPage.findOneAndUpdate({ slug }, { $set: initial }, { new: true, upsert: true, lean: true });
+    }
+    if (!page) throw notFoundError("Landing page not found");
+    if (slug === "pricing") {
+        // Checkout validates codes and prices against published Plan records.
+        // Keep the public pricing page in sync so onboarding cannot submit stale CMS plans.
+        const plans = await Plan.find({ status: "published", visibility: "public" })
+            .sort({ sortOrder: 1, createdAt: 1 })
+            .select("code name description eyebrow popular currency pricing ctaLabel ctaPath features")
+            .lean()
+            .exec();
+        if (plans.length) {
+            const planSection = page.sections.find((section: { type?: string }) => section.type === "plans");
+            if (planSection) {
+                planSection.items = plans.map(plan => ({
+                    code: plan.code,
+                    eyebrow: plan.eyebrow || "",
+                    name: plan.name,
+                    description: plan.description || "",
+                    monthlyPrice: plan.pricing?.monthly ?? null,
+                    yearlyPrice: plan.pricing?.yearly ?? null,
+                    currency: plan.currency || "USD",
+                    popular: Boolean(plan.popular),
+                    ctaLabel: plan.ctaLabel || "Choose plan",
+                    ctaPath: plan.ctaPath || "",
+                    features: plan.features || [],
+                }));
+            }
+        }
     }
     return { page };
 };
