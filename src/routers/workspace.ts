@@ -217,5 +217,6 @@ workspaceRouter.put(
     validateRequest,
     workspaceController.edit,
 );
+workspaceRouter.delete("/systems-mgmt/:workspace", workspaceController.remove);
 
 export default workspaceRouter;

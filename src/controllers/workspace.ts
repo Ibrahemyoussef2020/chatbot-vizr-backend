@@ -45,7 +45,20 @@ const update = async (req: Request, res: Response) => {
     });
 };
 
+const deactivate = async (req: Request, res: Response) => {
+    const data = await workspaceService.deleteWorkspace(
+        res.locals.user,
+        String(req.params.workspace),
+    );
+
+    res.status(200).json({
+        data,
+        message: "Workspace deactivated successfully",
+    });
+};
+
 export const list = asyncHandler(index);
 export const store = asyncHandler(create);
 export const get = asyncHandler(show);
 export const edit = asyncHandler(update);
+export const remove = asyncHandler(deactivate);

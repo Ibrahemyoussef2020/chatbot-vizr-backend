@@ -147,3 +147,21 @@ export const updateWorkspace = async (
 
     return serialize(updated);
 };
+
+export const deleteWorkspace = async (user: AuthenticatedUserContext, identifier: string) => {
+    if (user.role !== "super_admin") {
+        throw forbiddenError("Only a global administrator can delete workspaces");
+    }
+
+    const workspace = await getWorkspace(user, identifier);
+    const updated = await Workspace.findByIdAndUpdate(
+        workspace.id,
+        { $set: { isActive: false } },
+        { returnDocument: "after", runValidators: true },
+    ).lean().exec();
+
+    if (!updated) throw notFoundError("Workspace not found");
+
+    // Workspace deletion is a soft delete so tenant data and credentials remain recoverable.
+    return serialize(updated);
+};
