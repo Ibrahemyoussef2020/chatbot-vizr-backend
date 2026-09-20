@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import PaymentMethodConfig from "../../models/PaymentMethodConfig.js";
+import WorkspacePaymentMethodConfig from "../../models/WorkspacePaymentMethodConfig.js";
+import { listCheckoutPaymentMethods } from "./businessPaymentMethods.js";
 import { listBusinessPaymentMethods, saveBusinessPaymentMethod } from "./businessPaymentMethods.js";
 
 test("method configuration uses registered providers and hides credentials", async () => {
@@ -19,6 +21,22 @@ test("method configuration uses registered providers and hides credentials", asy
         await assert.rejects(() => saveBusinessPaymentMethod(user, "vodafone_cash", { ...input, supportedCurrencies: ["EUR"] }), { statusCode: 422 });
         const saved = await saveBusinessPaymentMethod(user, "vodafone_cash", input);
         assert.equal(saved?.isEnabled, true);
+        const workspaceId = new mongoose.Types.ObjectId();
+        await WorkspacePaymentMethodConfig.create({
+            workspaceId,
+            provider: "vodafone_cash",
+            label: "Old workspace wallet",
+            isEnabled: false,
+            isTestMode: true,
+            sortOrder: 0,
+            instructions: "",
+            supportedCurrencies: ["EGP"],
+            settings: {},
+        });
+        const checkoutMethods = await listCheckoutPaymentMethods(undefined, String(workspaceId));
+        const checkoutWallet = checkoutMethods.find(method => method.provider === "vodafone_cash");
+        assert.equal(checkoutWallet?.label, "Wallet");
+        assert.deepEqual(checkoutWallet?.supportedCurrencies, ["EGP"]);
         await PaymentMethodConfig.updateOne({ provider: "vodafone_cash" }, { $set: { credentials: { secret: "hidden" } } });
         const methods = await listBusinessPaymentMethods(user);
         assert.equal(methods.length, 2);

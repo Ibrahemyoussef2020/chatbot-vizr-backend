@@ -1,13 +1,12 @@
 import { z } from "zod";
 import PaymentMethodConfig from "../../models/PaymentMethodConfig.js";
-import WorkspacePaymentMethodConfig from "../../models/WorkspacePaymentMethodConfig.js";
 import Workspace from "../../models/Workspace.js";
 import "../../core/payments/payment.strategies.js";
 import { PaymentGatewayFactory } from "../../core/payments/payment-gateway.factory.js";
 import { authorizeBusinessPayment } from "./authorization.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
-import { encryptCredential, decryptCredential, stripeCredentialEnvironment } from "./credentialVault.js";
+import { stripeCredentialEnvironment } from "./credentialVault.js";
 import { getEffectivePaymentMethodConfig, resolveWorkspaceForPayment } from "./paymentMethodConfig.js";
 
 const inputSchema = z.object({
@@ -25,15 +24,12 @@ const inputSchema = z.object({
 
 export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext, requestedWorkspace?: string) => {
     authorizeBusinessPayment(user, "payment_methods.manage");
-    const workspaceId = await resolveWorkspaceForPayment(user, requestedWorkspace);
-    const workspace = workspaceId ? await Workspace.findById(workspaceId).select("name").lean().exec() : null;
+    await resolveWorkspaceForPayment(user, requestedWorkspace);
     return Promise.all(PaymentGatewayFactory.listDescriptors().map(async descriptor => {
-        const config = await getEffectivePaymentMethodConfig(descriptor.provider, workspaceId);
+        const config = await getEffectivePaymentMethodConfig(descriptor.provider);
         const envKeys = stripeCredentialEnvironment;
         const credentialStatus = Object.fromEntries(descriptor.credentialFields.map(field => {
-            const source = config?.workspaceCredentialKeys.includes(field.key)
-                ? "workspace"
-                : config?.globalCredentialKeys.includes(field.key)
+            const source = config?.globalCredentialKeys.includes(field.key)
                     ? "global"
                     : envKeys[field.key] && process.env[envKeys[field.key]]
                         ? "environment"
@@ -48,7 +44,7 @@ export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext,
             availableCurrencies: descriptor.supportedCurrencies,
             credentialFields: descriptor.credentialFields,
             credentialStatus,
-            workspaceName: workspace?.name || "Global environment",
+            workspaceName: "Global settings",
             label: config?.label || descriptor.label,
             isEnabled: config?.isEnabled || false,
             isTestMode: config?.isTestMode ?? true,
@@ -62,9 +58,9 @@ export const listBusinessPaymentMethods = async (user: AuthenticatedUserContext,
 
 /** Safe checkout options for signed-in customers. Never returns gateway credentials. */
 export const listCheckoutPaymentMethods = async (user?: AuthenticatedUserContext, requestedWorkspace?: string) => {
-    const workspaceId = user ? await resolveWorkspaceForPayment(user, requestedWorkspace) : undefined;
+    if (user && requestedWorkspace) await resolveWorkspaceForPayment(user, requestedWorkspace);
     const methods = await Promise.all(PaymentGatewayFactory.listDescriptors().map(async descriptor => {
-        const config = await getEffectivePaymentMethodConfig(descriptor.provider, workspaceId);
+        const config = await getEffectivePaymentMethodConfig(descriptor.provider);
         if (!config?.isEnabled) return null;
         return {
             provider: descriptor.provider,
@@ -109,13 +105,10 @@ export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, 
             throw unprocessableEntityError(`Invalid ${field.label}.`);
         }
     }
-    const workspaceConfig = workspaceId
-        ? await WorkspacePaymentMethodConfig.findOne({ workspaceId, provider }).select("+credentials").exec()
-        : null;
+    // Payment methods are a global platform setting shared by every workspace.
     const globalConfig = await PaymentMethodConfig.findOne({ provider }).exec();
-    const workspaceCredentials = workspaceConfig ? Object.fromEntries([...workspaceConfig.credentials].map(([key, value]) => [key, decryptCredential(value)])) : {};
     const globalCredentials = globalConfig ? Object.fromEntries(globalConfig.credentials) : {};
-    const credentials: Record<string, string> = { ...globalCredentials, ...workspaceCredentials };
+    const credentials: Record<string, string> = { ...globalCredentials };
     for (const key of data.clearCredentials) {
         delete credentials[key];
         if (globalCredentials[key]) credentials[key] = globalCredentials[key];
@@ -153,23 +146,10 @@ export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, 
         }
     }
     const { credentials: _credentials, clearCredentials: _clearCredentials, system_slug: _systemSlug, ...configData } = data;
-    if (workspaceId) {
-        const storedCredentials = workspaceConfig ? Object.fromEntries(workspaceConfig.credentials) : {};
-        for (const key of data.clearCredentials) delete storedCredentials[key];
-        for (const [key, value] of Object.entries(data.credentials)) {
-            if (value.trim()) storedCredentials[key] = encryptCredential(value.trim());
-        }
-        await WorkspacePaymentMethodConfig.updateOne(
-            { workspaceId, provider },
-            { $set: { ...configData, credentials: storedCredentials }, $setOnInsert: { workspaceId, provider } },
-            { upsert: true, runValidators: true },
-        );
-    } else {
-        await PaymentMethodConfig.updateOne(
-            { provider },
-            { $set: { ...configData, credentials }, $setOnInsert: { provider } },
-            { upsert: true, runValidators: true },
-        );
-    }
-    return (await listBusinessPaymentMethods(user, requestedWorkspace || data.system_slug)).find(item => item.provider === provider);
+    await PaymentMethodConfig.updateOne(
+        { provider },
+        { $set: { ...configData, credentials }, $setOnInsert: { provider } },
+        { upsert: true, runValidators: true },
+    );
+    return (await listBusinessPaymentMethods(user)).find(item => item.provider === provider);
 };
