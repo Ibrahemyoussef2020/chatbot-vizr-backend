@@ -165,13 +165,13 @@ export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserCont
         return { active: false, pending: false, planCode: null, paymentStatus: null };
     }
     const workspace = await Workspace.findById(user.workspaceId).select("selectedPlanCode").lean().exec();
-    if (!workspace?.selectedPlanCode) return { active: false, pending: false, planCode: null, paymentStatus: null };
-    const subscription = await Subscription.findOne({
+    const selectedPlanCode = workspace?.selectedPlanCode || "";
+    const subscription = selectedPlanCode ? await Subscription.findOne({
         workspaceId: user.workspaceId,
         status: { $in: ["trialing", "active"] },
         currentPeriodEnd: { $gt: new Date() },
-    }).select("planCode status currentPeriodEnd").lean().exec();
-    const matchesSelectedPlan = subscription?.planCode === workspace.selectedPlanCode;
+    }).select("planCode status currentPeriodEnd").lean().exec() : null;
+    const matchesSelectedPlan = subscription?.planCode === selectedPlanCode;
     if (matchesSelectedPlan) {
         return {
             active: true,
@@ -183,8 +183,11 @@ export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserCont
         };
     }
     const pendingPayment = await PaymentTransaction.findOne({
-        workspaceId: user.workspaceId,
-        planCode: workspace.selectedPlanCode,
+        $or: [
+            { workspaceId: user.workspaceId },
+            { userId: user.id },
+        ],
+        ...(selectedPlanCode ? { planCode: selectedPlanCode } : {}),
         status: { $in: ["pending", "awaiting_review", "succeeded"] },
     }).sort({ createdAt: -1 }).select("planCode status provider reference createdAt").lean().exec();
     const isPending = Boolean(pendingPayment);

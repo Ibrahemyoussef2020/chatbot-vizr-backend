@@ -39,6 +39,14 @@ test("subscription status keeps paid workspaces in dashboard while payment is pe
         assert.equal(pending.paymentStatus, "awaiting_review");
         assert.equal(pending.paymentReference, transaction.reference);
 
+        workspace.selectedPlanCode = "";
+        await workspace.save();
+        const pendingWithoutSavedWorkspacePlan = await getWorkspaceSubscriptionStatus(user);
+        assert.equal(pendingWithoutSavedWorkspacePlan.pending, true);
+        assert.equal(pendingWithoutSavedWorkspacePlan.planCode, "starter");
+        workspace.selectedPlanCode = "starter";
+        await workspace.save();
+
         transaction.status = "succeeded";
         await transaction.save();
         const awaitingActivation = await getWorkspaceSubscriptionStatus(user);
