@@ -162,20 +162,39 @@ export const startFreeSubscription = async (
 
 export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserContext) => {
     if (!user.workspaceId || user.role === "super_admin") {
-        return { active: false, planCode: null };
+        return { active: false, pending: false, planCode: null, paymentStatus: null };
     }
     const workspace = await Workspace.findById(user.workspaceId).select("selectedPlanCode").lean().exec();
-    if (!workspace?.selectedPlanCode) return { active: false, planCode: null };
+    if (!workspace?.selectedPlanCode) return { active: false, pending: false, planCode: null, paymentStatus: null };
     const subscription = await Subscription.findOne({
         workspaceId: user.workspaceId,
         status: { $in: ["trialing", "active"] },
         currentPeriodEnd: { $gt: new Date() },
     }).select("planCode status currentPeriodEnd").lean().exec();
     const matchesSelectedPlan = subscription?.planCode === workspace.selectedPlanCode;
+    if (matchesSelectedPlan) {
+        return {
+            active: true,
+            pending: false,
+            planCode: subscription.planCode,
+            status: subscription.status,
+            paymentStatus: null,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+        };
+    }
+    const pendingPayment = await PaymentTransaction.findOne({
+        workspaceId: user.workspaceId,
+        planCode: workspace.selectedPlanCode,
+        status: { $in: ["pending", "awaiting_review", "succeeded"] },
+    }).sort({ createdAt: -1 }).select("planCode status provider reference createdAt").lean().exec();
+    const isPending = Boolean(pendingPayment);
     return {
-        active: Boolean(matchesSelectedPlan),
-        planCode: matchesSelectedPlan ? subscription?.planCode || null : null,
-        status: matchesSelectedPlan ? subscription?.status || null : null,
-        currentPeriodEnd: matchesSelectedPlan ? subscription?.currentPeriodEnd || null : null,
+        active: false,
+        pending: isPending,
+        planCode: isPending ? pendingPayment?.planCode || null : null,
+        status: isPending ? "pending_payment" : null,
+        paymentStatus: isPending ? pendingPayment?.status || null : null,
+        paymentProvider: isPending ? pendingPayment?.provider || null : null,
+        paymentReference: isPending ? pendingPayment?.reference || null : null,
     };
 };
