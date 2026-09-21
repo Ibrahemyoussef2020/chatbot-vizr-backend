@@ -139,9 +139,6 @@ export const saveBusinessPaymentMethod = async (user: AuthenticatedUserContext, 
             if (!secretKey.startsWith(data.isTestMode ? "sk_test_" : "sk_live_")) {
                 throw unprocessableEntityError("Stripe key does not match the selected test/live mode.");
             }
-            if (!(credentials.webhookSecret || process.env.STRIPE_WEBHOOK_SECRET)) {
-                throw unprocessableEntityError("Configure the Stripe webhook secret before enabling this method.");
-            }
         }
         if (provider === "vodafone_cash" && !data.isTestMode && data.supportedCurrencies.includes("USD")) {
             throw unprocessableEntityError("Live Vodafone Cash transfers accept EGP only. USD is available only in test mode.");
