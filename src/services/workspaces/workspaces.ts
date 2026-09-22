@@ -67,7 +67,11 @@ const scope = (user: AuthenticatedUserContext) => {
     // Business admins may own multiple workspaces. Keep their tenant scope
     // anchored to ownership so newly created workspaces are immediately
     // visible and editable instead of being limited to user.workspaceId.
-    if (user.role === "admin") return { ownerId: user.id };
+    if (user.role === "admin") {
+        return user.workspaceId
+            ? { $or: [{ ownerId: user.id }, { _id: user.workspaceId }] }
+            : { ownerId: user.id };
+    }
     if (!user.workspaceId) throw forbiddenError("No workspace is assigned to this account");
 
     return { _id: user.workspaceId };
