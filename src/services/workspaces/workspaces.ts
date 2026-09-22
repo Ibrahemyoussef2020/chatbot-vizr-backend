@@ -23,9 +23,12 @@ const slugify = (value: string) => value
 
 const uniqueSlug = async (name: string) => {
     const base = slugify(name) || "workspace";
-    const exists = await Workspace.exists({ slug: base });
-
-    return exists ? `${base}-${randomBytes(3).toString("hex")}` : base;
+    let candidate = base;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        if (!(await Workspace.exists({ slug: candidate }))) return candidate;
+        candidate = `${base}-${randomBytes(4).toString("hex")}`;
+    }
+    return `${base}-${randomBytes(8).toString("hex")}`;
 };
 
 export const createInitialWorkspace = async (userId: Types.ObjectId, userName: string) => {
@@ -199,7 +202,7 @@ export const updateWorkspace = async (
     if (!workspace && user.role === "admin" && input.name?.trim() && !Types.ObjectId.isValid(identifier)) {
         workspace = await Workspace.create({
             name: input.name.trim(),
-            slug: slugify(identifier) || await uniqueSlug(input.name),
+            slug: await uniqueSlug(input.name),
             ownerId: user.id,
             businessName: input.business_name?.trim() || "",
             selectedPlanCode: input.selected_plan_code?.trim().toLowerCase() || "",
