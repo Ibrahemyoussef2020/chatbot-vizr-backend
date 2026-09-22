@@ -190,7 +190,23 @@ export const updateWorkspace = async (
         rate_limit?: number;
     },
 ) => {
-    const workspace = await getWorkspace(user, identifier);
+    const accessScope = scope(user);
+    const identifierScope = Types.ObjectId.isValid(identifier) ? { _id: identifier } : { slug: identifier };
+    let workspace = await Workspace.findOne({ $and: [accessScope, identifierScope] }).exec();
+    // Registration normally creates this record, but older accounts can reach
+    // onboarding with only a workspace slug. Treat the first profile update as
+    // the initial workspace creation instead of returning a misleading 404.
+    if (!workspace && user.role === "admin" && input.name?.trim() && !Types.ObjectId.isValid(identifier)) {
+        workspace = await Workspace.create({
+            name: input.name.trim(),
+            slug: slugify(identifier) || await uniqueSlug(input.name),
+            ownerId: user.id,
+            businessName: input.business_name?.trim() || "",
+            selectedPlanCode: input.selected_plan_code?.trim().toLowerCase() || "",
+        });
+        await ensureWorkspaceChannelDefaults(workspace._id);
+    }
+    if (!workspace) throw notFoundError("Workspace not found");
     const changes: Record<string, unknown> = {};
 
     if (input.name !== undefined) changes.name = input.name.trim();
