@@ -64,6 +64,10 @@ export const ensureUserWorkspace = async (user: {
 
 const scope = (user: AuthenticatedUserContext) => {
     if (user.role === "super_admin") return {};
+    // Business admins may own multiple workspaces. Keep their tenant scope
+    // anchored to ownership so newly created workspaces are immediately
+    // visible and editable instead of being limited to user.workspaceId.
+    if (user.role === "admin") return { ownerId: user.id };
     if (!user.workspaceId) throw forbiddenError("No workspace is assigned to this account");
 
     return { _id: user.workspaceId };
@@ -127,8 +131,8 @@ export const createWorkspace = async (
         rate_limit?: number;
     },
 ) => {
-    if (user.role !== "super_admin") {
-        throw forbiddenError("Only a global administrator can create workspaces");
+    if (user.role !== "super_admin" && user.role !== "admin") {
+        throw forbiddenError("Only a business administrator can create workspaces");
     }
 
     const workspace = await Workspace.create({

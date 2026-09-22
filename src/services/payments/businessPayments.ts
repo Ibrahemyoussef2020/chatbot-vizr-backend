@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import { z } from "zod";
 import PaymentTransaction from "../../models/PaymentTransaction.js";
-import "../../models/Workspace.js";
+import { Subscription, Workspace } from "../../models/index.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
 import { authorizeBusinessPayment } from "./authorization.js";
@@ -41,4 +41,34 @@ export const readBusinessPayment = async (user: AuthenticatedUserContext, id: st
     const payment = await PaymentTransaction.findById(id).select(paymentProjection).populate("workspaceId", "name slug").lean().exec();
     if (!payment) throw notFoundError("Payment not found.");
     return payment;
+};
+
+export const decideBusinessPayment = async (user: AuthenticatedUserContext, id: string, decision: "approve" | "reject", note: string) => {
+    if (user.role !== "super_admin") throw new Error("Only a super administrator can confirm workspace payments.");
+    if (!Types.ObjectId.isValid(id)) throw notFoundError("Payment not found.");
+    const payment = await PaymentTransaction.findById(id).exec();
+    if (!payment) throw notFoundError("Payment not found.");
+    if (!["pending", "awaiting_review"].includes(payment.status)) throw unprocessableEntityError("This payment has already been decided.");
+    const message = note.trim().slice(0, 1000);
+    payment.reviewedBy = new Types.ObjectId(user.id);
+    payment.reviewedAt = new Date();
+    payment.reviewNote = message;
+    if (decision === "approve") {
+        payment.status = "succeeded";
+        const workspace = payment.workspaceId ? await Workspace.findById(payment.workspaceId).exec() : null;
+        if (workspace) {
+            workspace.selectedPlanCode = payment.planCode;
+            workspace.isActive = true;
+            await workspace.save();
+            const start = new Date();
+            const end = new Date(start);
+            payment.billingCycle === "yearly" ? end.setFullYear(end.getFullYear() + 1) : end.setMonth(end.getMonth() + 1);
+            await Subscription.findOneAndUpdate({ workspaceId: workspace._id, status: { $in: ["trialing", "active", "past_due"] } }, { $set: { planId: payment.planId, planCode: payment.planCode, status: "active", billingCycle: payment.billingCycle, currentPeriodStart: start, currentPeriodEnd: end, provider: payment.provider, cancelAtPeriodEnd: false }, $setOnInsert: { workspaceId: workspace._id } }, { upsert: true, new: true, runValidators: true }).exec();
+        }
+    } else {
+        payment.status = "failed";
+        payment.failureReason = message || "Workspace request was refused by the business administrator.";
+    }
+    await payment.save();
+    return { status: payment.status, message: message || (decision === "approve" ? "Workspace approved." : "Workspace refused.") };
 };

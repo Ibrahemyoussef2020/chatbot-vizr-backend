@@ -17,3 +17,7 @@ export const seedConfig = {
         { name: "Cedar Academy", slug: "cedar-academy", rateLimit: 90, ownership: "client" as const, ownerKey: "cedar-academy-owner" },
     ],
 } as const;
+
+
+// xyje@mailinator.com xyje@mailinator.com
+// kowavyvyf@mailinator.com
