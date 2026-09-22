@@ -161,11 +161,16 @@ export const startFreeSubscription = async (
 };
 
 export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserContext) => {
-    if (!user.workspaceId || user.role === "super_admin") {
+    if (user.role === "super_admin") {
         return { active: false, pending: false, planCode: null, paymentStatus: null };
     }
-    const workspace = await Workspace.findById(user.workspaceId).select("selectedPlanCode").lean().exec();
-    const selectedPlanCode = workspace?.selectedPlanCode || "";
+    const latestPayment = await PaymentTransaction.findOne({
+        $or: [{ userId: user.id }, ...(user.workspaceId ? [{ workspaceId: user.workspaceId }] : [])],
+    }).sort({ createdAt: -1 }).select("workspaceId planCode status provider reference createdAt reviewNote failureReason").lean().exec();
+    const workspaceId = latestPayment?.workspaceId || user.workspaceId;
+    if (!workspaceId) return { active: false, pending: false, planCode: null, paymentStatus: null };
+    const workspace = await Workspace.findById(workspaceId).select("selectedPlanCode").lean().exec();
+    const selectedPlanCode = workspace?.selectedPlanCode || latestPayment?.planCode || "";
     const subscription = selectedPlanCode ? await Subscription.findOne({
         workspaceId: user.workspaceId,
         status: { $in: ["trialing", "active"] },
@@ -187,9 +192,17 @@ export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserCont
             { workspaceId: user.workspaceId },
             { userId: user.id },
         ],
-        ...(selectedPlanCode ? { planCode: selectedPlanCode } : {}),
         status: { $in: ["pending", "awaiting_review", "succeeded"] },
-    }).sort({ createdAt: -1 }).select("planCode status provider reference createdAt").lean().exec();
+    }).sort({ createdAt: -1 }).select("planCode status provider reference createdAt reviewNote failureReason").lean().exec();
+    const rejectedPayment = await PaymentTransaction.findOne({
+        $or: [{ userId: user.id }, ...(user.workspaceId ? [{ workspaceId: user.workspaceId }] : [])],
+        status: "failed",
+    }).sort({ createdAt: -1 }).select("planCode status provider reference reviewNote failureReason createdAt").lean().exec();
+    if (!pendingPayment && rejectedPayment) return {
+        active: false, pending: false, rejected: true, planCode: rejectedPayment.planCode,
+        paymentStatus: "failed", paymentReference: rejectedPayment.reference,
+        rejectionMessage: rejectedPayment.failureReason || rejectedPayment.reviewNote || "Your workspace request was refused.",
+    };
     const isPending = Boolean(pendingPayment);
     return {
         active: false,
