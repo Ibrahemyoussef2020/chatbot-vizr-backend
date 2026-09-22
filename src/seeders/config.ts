@@ -21,3 +21,4 @@ export const seedConfig = {
 
 // xyje@mailinator.com xyje@mailinator.com
 // kowavyvyf@mailinator.com
+// buvyqo@mailinator.com
