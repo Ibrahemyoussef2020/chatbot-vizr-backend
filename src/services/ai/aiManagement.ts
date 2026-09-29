@@ -14,6 +14,7 @@ import {
     notFoundError,
     unprocessableEntityError,
 } from "../../core/shared/errors/HttpError.js";
+import { ensureDefaults } from "../auth/securityRole.js";
 import {
     hasProviderCredentials,
     providerDefinitions,
@@ -362,6 +363,7 @@ export const deleteAIAgentService = async (
 
 export const getAIRuntimeService = async (user: AuthenticatedUserContext, slug?: string) => {
     const workspace = await resolveWorkspace(user, slug);
+    await ensureDefaults(String(workspace._id));
     const roles = await SecurityRole.find({
         scope: "workspace",
         $or: [{ workspaceId: workspace._id }, { workspaceId: null }],

@@ -8,7 +8,9 @@ const workspaceForUser = async (user: AuthenticatedUserContext, slug?: string) =
         ? await Workspace.findOne({ slug: slug.toLowerCase() }).exec()
         : await Workspace.findById(user.workspaceId).exec();
     if (!workspace) throw notFoundError("Workspace not found.");
-    if (user.role !== "super_admin" && String(workspace._id) !== user.workspaceId) {
+    if (user.role !== "super_admin"
+        && String(workspace.ownerId) !== String(user.id)
+        && String(workspace._id) !== String(user.workspaceId || "")) {
         throw forbiddenError("You cannot manage roles outside your workspace.");
     }
     return workspace;
@@ -27,7 +29,7 @@ const defaultsFor = (workspaceId?: string) => workspaceId ? [
     { code: "business_admin", name: "Business Admin", description: "Business-owner assistant with delegated platform permissions.", permissions: businessAdminPermissions },
 ];
 
-const ensureDefaults = async (workspaceId?: string) => Promise.all(defaultsFor(workspaceId).map((role) =>
+export const ensureDefaults = async (workspaceId?: string) => Promise.all(defaultsFor(workspaceId).map((role) =>
     SecurityRole.findOneAndUpdate(
         { workspaceId: workspaceId || null, code: role.code },
         {
