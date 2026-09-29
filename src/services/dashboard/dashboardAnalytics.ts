@@ -87,25 +87,13 @@ export const getThreadAnalytics = async (
         ]),
     ]);
 
-    const channelBreakdown = [
-        { name: "Web Chat Widget", count: Math.round(totalInPeriod * 0.65), sharePercent: 65 },
-        { name: "WhatsApp Business", count: Math.round(totalInPeriod * 0.22), sharePercent: 22 },
-        { name: "Telegram Bot", count: Math.round(totalInPeriod * 0.09), sharePercent: 9 },
-        { name: "Commerce API", count: Math.round(totalInPeriod * 0.04), sharePercent: 4 },
-    ];
+    const channelBreakdown: Array<{ name: string; count: number; sharePercent: number }> = [];
+    const topicBreakdown: Array<{ topic: string; count: number; sharePercent: number }> = [];
 
-    const topicBreakdown = [
-        { topic: "Shipping & Delivery", count: Math.round(totalInPeriod * 0.35), sharePercent: 35 },
-        { topic: "Returns & Refunds", count: Math.round(totalInPeriod * 0.25), sharePercent: 25 },
-        { topic: "Product Specifications", count: Math.round(totalInPeriod * 0.20), sharePercent: 20 },
-        { topic: "Billing & Subscriptions", count: Math.round(totalInPeriod * 0.12), sharePercent: 12 },
-        { topic: "Integration & Setup", count: Math.round(totalInPeriod * 0.08), sharePercent: 8 },
-    ];
-
-    const totalCalculated = Math.max(totalInPeriod, 1);
-    const automatedPercent = Math.round((endedInPeriod / totalCalculated) * 100);
-    const openPercent = Math.round((activeInPeriod / totalCalculated) * 100);
-    const escalatedPercent = Math.max(0, 100 - automatedPercent - openPercent);
+    const totalCalculated = totalInPeriod;
+    const automatedPercent = totalCalculated > 0 ? Math.round((endedInPeriod / totalCalculated) * 100) : 0;
+    const openPercent = totalCalculated > 0 ? Math.round((activeInPeriod / totalCalculated) * 100) : 0;
+    const escalatedPercent = totalCalculated > 0 ? Math.max(0, 100 - automatedPercent - openPercent) : 0;
 
     const hourlyMap = new Map<number, number>();
     for (const item of hourlyAggregate) {
@@ -146,17 +134,17 @@ export const getThreadAnalytics = async (
             totalInPeriod,
             activeInPeriod,
             endedInPeriod,
-            slaResponseSec: 1.2,
-            csatScore: 4.9,
-            aiResolutionPercent: automatedPercent > 0 ? automatedPercent : 78,
+            slaResponseSec: 0,
+            csatScore: 0,
+            aiResolutionPercent: automatedPercent,
         },
         time_series: timeSeries,
         channels: channelBreakdown,
         topics: topicBreakdown,
         resolution_split: [
-            { label: "AI Automated", value: automatedPercent > 0 ? automatedPercent : 75, color: "var(--primary)" },
-            { label: "Escalated to Agent", value: escalatedPercent > 0 ? escalatedPercent : 15, color: "var(--warning)" },
-            { label: "Pending Customer", value: openPercent > 0 ? openPercent : 10, color: "var(--secondary)" },
+            { label: "AI Automated", value: automatedPercent, color: "var(--primary)" },
+            { label: "Escalated to Agent", value: escalatedPercent, color: "var(--warning)" },
+            { label: "Pending Customer", value: openPercent, color: "var(--secondary)" },
         ],
         hourly_activity: hourlyActivity,
     };

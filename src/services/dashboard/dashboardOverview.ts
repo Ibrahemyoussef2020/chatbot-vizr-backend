@@ -97,10 +97,10 @@ export const getOverview = async (
         ? await Message.countDocuments({ conversationId: { $in: conversationIds } })
         : 0;
 
-    const totalCalc = Math.max(total, 1);
-    const endedPercent = Math.round((ended / totalCalc) * 100);
-    const aiResolutionPercent = endedPercent > 0 ? endedPercent : 78;
-    const humanHandoffPercent = 100 - aiResolutionPercent;
+    const totalCalc = total;
+    const endedPercent = totalCalc > 0 ? Math.round((ended / totalCalc) * 100) : 0;
+    const aiResolutionPercent = endedPercent;
+    const humanHandoffPercent = totalCalc > 0 ? Math.max(0, 100 - aiResolutionPercent) : 0;
 
     const hourlyMap = new Map<number, number>();
     for (const item of hourlyAggregate) {
@@ -139,34 +139,23 @@ export const getOverview = async (
         stats: {
             total,
             open: active,
-            pending: Math.round(active * 0.15),
+            pending: 0,
             closed: ended,
-            unassigned: active,
+            unassigned: 0,
             recent,
             recent_message_count: messageCount,
             aiResolutionPercent,
             humanHandoffPercent,
-            avgResponseSec: 1.2,
-            csatScore: 4.9,
-            ragAccuracyPercent: 96.4,
-            leadsCaptured: Math.round(total * 0.45),
+            avgResponseSec: 0,
+            csatScore: 0,
+            ragAccuracyPercent: 0,
+            leadsCaptured: 0,
             tokenRuns: tokenLogsCount,
             crmTags: tagCount,
         },
         time_series: timeSeries,
-        channels: [
-            { name: "Web Chat Widget", count: Math.round(totalCalc * 0.65), sharePercent: 65 },
-            { name: "WhatsApp Business", count: Math.round(totalCalc * 0.22), sharePercent: 22 },
-            { name: "Telegram Bot", count: Math.round(totalCalc * 0.09), sharePercent: 9 },
-            { name: "Commerce API", count: Math.round(totalCalc * 0.04), sharePercent: 4 },
-        ],
-        topics: [
-            { topic: "Shipping & Delivery", count: Math.round(totalCalc * 0.35), sharePercent: 35 },
-            { topic: "Returns & Refunds", count: Math.round(totalCalc * 0.25), sharePercent: 25 },
-            { topic: "Product Specifications", count: Math.round(totalCalc * 0.20), sharePercent: 20 },
-            { topic: "Billing & Subscriptions", count: Math.round(totalCalc * 0.12), sharePercent: 12 },
-            { topic: "Integration & Setup", count: Math.round(totalCalc * 0.08), sharePercent: 8 },
-        ],
+        channels: [],
+        topics: [],
         hourly_activity: hourlyActivity,
         recent_threads: conversations.map((conversation) => ({
             id: conversation.publicId,
