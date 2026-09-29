@@ -34,7 +34,10 @@ export const resolveWorkspace = async (
         throw notFoundError("Workspace not found.");
     }
 
-    const belongsToUser = String(workspace._id) === user.workspaceId;
+    // Workspace owners retain access even when the session's workspaceId is
+    // missing or stale; ownership is authoritative for workspace-scoped AI.
+    const belongsToUser = String(workspace.ownerId) === String(user.id)
+        || String(workspace._id) === String(user.workspaceId || "");
     if (user.role !== "super_admin" && !belongsToUser) {
         throw forbiddenError("Workspace access denied.");
     }
