@@ -30,13 +30,14 @@ const resolveWorkspaceSlug = async (
         return workspace.slug;
     }
 
-    if (!user.workspaceId) throw forbiddenError("No workspace is assigned to this account");
-
-    const workspace = await Workspace.findById(user.workspaceId).lean().exec();
+    const workspace = await Workspace.findOne({
+        slug: requestedSlug,
+        $or: [
+            ...(user.workspaceId ? [{ _id: user.workspaceId }] : []),
+            { ownerId: user.id },
+        ],
+    }).lean().exec();
     if (!workspace) throw notFoundError("Workspace not found");
-    if (requestedSlug && requestedSlug !== workspace.slug) {
-        throw forbiddenError("You do not have access to this workspace");
-    }
 
     return workspace.slug;
 };
