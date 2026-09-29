@@ -191,7 +191,8 @@ export const askKnowledgeBase = async (user: AuthenticatedUserContext, workspace
     const execution = await resolveAIExecutionConfig({
         systemSlug: workspaceSlug,
         channel: "web",
-        modelId: session.selectedModelId ? String(session.selectedModelId) : undefined,
+        // Knowledge Base always uses the managed GPT default. Do not reuse a
+        // stale model id saved on an older session.
         providerName: process.env.DEFAULT_AI_PROVIDER || "openai",
         modelName: process.env.DEFAULT_AI_MODEL || process.env.OPENAI_MODEL,
     });

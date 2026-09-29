@@ -89,8 +89,10 @@ export const resolveAIExecutionConfig = async (input: {
     if (!workspace.defaultAiAgentId) {
         const providerName = input.providerName?.trim() || process.env.DEFAULT_AI_PROVIDER?.trim() || "vercel";
         const provider = await AIProvider.findOne({ code: providerName }).lean().exec();
-        const model = provider && input.modelName
-            ? await AIModel.findOne({ providerId: provider._id, externalId: input.modelName }).lean().exec()
+        const model = provider
+            ? input.modelName
+                ? await AIModel.findOne({ providerId: provider._id, externalId: input.modelName, enabled: true }).lean().exec()
+                : await AIModel.findOne({ providerId: provider._id, enabled: true, "capabilities.text": { $ne: false } }).sort({ priority: 1, _id: 1 }).lean().exec()
             : null;
         if (provider?.enabled === false || model?.enabled === false) {
             throw forbiddenError("The selected AI provider or model is disabled.");
@@ -103,11 +105,11 @@ export const resolveAIExecutionConfig = async (input: {
                 id: model ? String(model._id) : "",
                 providerId: provider ? String(provider._id) : "",
                 provider: providerName,
-                externalId: input.modelName ?? "",
+                externalId: model ? currentExternalModelId(providerName, model.externalId) : "",
                 priority: 100,
             }],
             options: {
-                ...(input.modelName && { model: input.modelName }),
+                ...(model && { model: currentExternalModelId(providerName, model.externalId) }),
                 maxTokens: positiveEnvironmentInteger(process.env.CHAT_AI_MAX_OUTPUT_TOKENS, 1200),
                 timeoutMs: positiveEnvironmentInteger(process.env.CHAT_AI_TIMEOUT_MS, 45000),
             },
@@ -119,6 +121,22 @@ export const resolveAIExecutionConfig = async (input: {
         workspaceId: workspace._id,
     }).lean().exec();
     if (!agent || !agent.enabled) {
+        // Knowledge Base may use the configured platform GPT fallback when a
+        // workspace still points at an old or unavailable managed agent.
+        if (input.providerName) {
+            const provider = await AIProvider.findOne({ code: input.providerName }).lean().exec();
+            const model = provider
+                ? input.modelName
+                    ? await AIModel.findOne({ providerId: provider._id, externalId: input.modelName, enabled: true }).lean().exec()
+                    : await AIModel.findOne({ providerId: provider._id, enabled: true, "capabilities.text": { $ne: false } }).sort({ priority: 1, _id: 1 }).lean().exec()
+                : null;
+            if (!provider || !provider.enabled || !model) throw forbiddenError("No enabled GPT model is configured for Knowledge Base.");
+            return {
+                workspaceId: String(workspace._id), allowKnowledge: true, allowHistory: true,
+                models: [{ id: String(model._id), providerId: String(provider._id), provider: provider.code, externalId: currentExternalModelId(provider.code, model.externalId), priority: model.priority }],
+                options: { model: currentExternalModelId(provider.code, model.externalId), maxTokens: positiveEnvironmentInteger(process.env.CHAT_AI_MAX_OUTPUT_TOKENS, 1200), timeoutMs: positiveEnvironmentInteger(process.env.CHAT_AI_TIMEOUT_MS, 45000) },
+            };
+        }
         throw forbiddenError("The workspace's assigned AI agent is missing or disabled.");
     }
     if (agent.channels.length && !agent.channels.includes(input.channel)) {
