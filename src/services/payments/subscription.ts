@@ -172,7 +172,7 @@ export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserCont
     const workspace = await Workspace.findById(workspaceId).select("selectedPlanCode").lean().exec();
     const selectedPlanCode = workspace?.selectedPlanCode || latestPayment?.planCode || "";
     const subscription = selectedPlanCode ? await Subscription.findOne({
-        workspaceId: user.workspaceId,
+        workspaceId: workspaceId,
         status: { $in: ["trialing", "active"] },
         currentPeriodEnd: { $gt: new Date() },
     }).select("planCode status currentPeriodEnd").lean().exec() : null;

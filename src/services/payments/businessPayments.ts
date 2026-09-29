@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import { z } from "zod";
 import PaymentTransaction from "../../models/PaymentTransaction.js";
-import { Subscription, Workspace } from "../../models/index.js";
+import { Subscription, User, Workspace } from "../../models/index.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
 import { authorizeBusinessPayment } from "./authorization.js";
@@ -60,10 +60,19 @@ export const decideBusinessPayment = async (user: AuthenticatedUserContext, id: 
             workspace.selectedPlanCode = payment.planCode;
             workspace.isActive = true;
             await workspace.save();
+
+            // Approval is also the point at which the customer account is
+            // granted access. Registration normally sets this already, but
+            // repairing it here makes approval safe for older/incomplete
+            // payment records as well.
+            await User.findByIdAndUpdate(payment.userId, {
+                $set: { workspaceId: workspace._id, isActive: true },
+            }).exec();
+
             const start = new Date();
             const end = new Date(start);
             payment.billingCycle === "yearly" ? end.setFullYear(end.getFullYear() + 1) : end.setMonth(end.getMonth() + 1);
-            await Subscription.findOneAndUpdate({ workspaceId: workspace._id, status: { $in: ["trialing", "active", "past_due"] } }, { $set: { planId: payment.planId, planCode: payment.planCode, status: "active", billingCycle: payment.billingCycle, currentPeriodStart: start, currentPeriodEnd: end, provider: payment.provider, cancelAtPeriodEnd: false }, $setOnInsert: { workspaceId: workspace._id } }, { upsert: true, new: true, runValidators: true }).exec();
+            await Subscription.findOneAndUpdate({ workspaceId: workspace._id }, { $set: { planId: payment.planId, planCode: payment.planCode, status: "active", billingCycle: payment.billingCycle, currentPeriodStart: start, currentPeriodEnd: end, provider: payment.provider, cancelAtPeriodEnd: false }, $setOnInsert: { workspaceId: workspace._id } }, { upsert: true, new: true, runValidators: true }).exec();
         }
     } else {
         payment.status = "failed";
