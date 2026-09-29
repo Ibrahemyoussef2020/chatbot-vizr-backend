@@ -63,6 +63,23 @@ export const saveRoleService = async (user: AuthenticatedUserContext, payload: a
     const permissions = [...new Set<string>(payload.selectedPermissions || [])];
     if (permissions.some((id) => !valid.has(id))) throw unprocessableEntityError("One or more permissions are invalid.");
     let role = roleId ? await SecurityRole.findById(roleId).exec() : null;
+    if (role) {
+        if (String(role._id) === String(user.securityRoleId)) {
+            throw forbiddenError("You cannot edit your own role.");
+        }
+        const rank = (code: string, scope: string) => {
+            if (code === "business_owner") return 5;
+            if (code === "business_admin") return 4;
+            if (code === "workspace_owner") return 4;
+            if (code === "workspace_admin") return 3;
+            if (code === "workspace_agent") return 2;
+            return scope === "business" ? 4 : 1;
+        };
+        const current = user.securityRoleId ? await SecurityRole.findById(user.securityRoleId).select("code scope").lean() : null;
+        if (current && rank(role.code, role.scope) >= rank(current.code, current.scope)) {
+            throw forbiddenError("You cannot edit a role at or above your access level.");
+        }
+    }
     if (role?.workspaceId && String(role.workspaceId) !== String(workspace._id)) throw forbiddenError("Role belongs to another workspace.");
     if (role && !role.workspaceId && user.role !== "super_admin") throw forbiddenError("Only the business owner can edit business roles.");
     if (!role) role = new SecurityRole({ workspaceId: workspace._id, scope: "workspace", isSystem: false, code: `custom_${Date.now()}` });
