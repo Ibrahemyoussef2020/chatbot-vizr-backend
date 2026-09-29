@@ -140,6 +140,29 @@ const finalizeVerifiedUpload = async (upload: any, asset: CloudinaryAsset) => {
             { upsert: true, new: true },
         ).exec();
         if (!source) throw internalServerError("Knowledge source metadata could not be created.");
+
+        // Direct-to-Cloudinary uploads do not pass through multer, so the
+        // normal synchronous ingestion path must download and extract the
+        // verified asset here before the source can become ready.
+        const response = await fetch(asset.secure_url, { signal: AbortSignal.timeout(60_000) });
+        if (!response.ok) throw internalServerError(`Knowledge asset could not be downloaded (${response.status}).`);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const processed = await KnowledgeFileProcessorFactory.create({
+            originalname: upload.fileName,
+            mimetype: upload.mimeType,
+            buffer,
+            size: buffer.length,
+        } as Express.Multer.File).process({
+            originalname: upload.fileName,
+            mimetype: upload.mimeType,
+            buffer,
+            size: buffer.length,
+        } as Express.Multer.File);
+        source.extractedText = processed.text.trim().slice(0, 2_000_000);
+        source.metadata = processed.metadata || {};
+        source.status = source.extractedText ? "ready" : "failed";
+        source.errorMessage = source.extractedText ? "" : "No readable content was extracted from the uploaded file.";
+        await source.save();
     } catch (error) {
         await destroyCloudinaryAsset(upload.resourceType, upload.publicId).catch(() => undefined);
         upload.status = "FAILED";
@@ -156,11 +179,16 @@ const finalizeVerifiedUpload = async (upload: any, asset: CloudinaryAsset) => {
     upload.completedAt = new Date();
     upload.expiresAt = undefined;
     await upload.save();
-    const [sourceCount, readySourceCount] = await Promise.all([
+    const [sourceCount, readySourceCount, failedSourceCount] = await Promise.all([
         SourceModel.countDocuments({ sessionId: upload.sessionId }),
         SourceModel.countDocuments({ sessionId: upload.sessionId, status: "ready" }),
+        SourceModel.countDocuments({ sessionId: upload.sessionId, status: "failed" }),
     ]);
-    await SessionModel.updateOne({ _id: upload.sessionId }, { sourceCount, readySourceCount, status: "processing" });
+    await SessionModel.updateOne({ _id: upload.sessionId }, {
+        sourceCount,
+        readySourceCount,
+        status: readySourceCount && failedSourceCount ? "partial" : readySourceCount ? "ready" : "failed",
+    });
     return serialize(upload);
 };
 
