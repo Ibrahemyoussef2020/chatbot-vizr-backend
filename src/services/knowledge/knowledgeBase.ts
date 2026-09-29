@@ -20,10 +20,20 @@ const OutputModel: any = KnowledgeOutput;
 const OutputSectionModel: any = KnowledgeOutputSection;
 
 const ownerWorkspace = async (user: AuthenticatedUserContext, workspaceSlug: string) => {
-    const workspace = await getWorkspace(user, workspaceSlug);
-    const owned = await WorkspaceModel.exists({ _id: workspace.id, ownerId: user.id });
-    if (!owned) throw forbiddenError("Only the workspace owner can access Knowledge Base data.");
-    return workspace;
+    // Super admins may target any workspace. For regular accounts, resolve
+    // the workspace by ownership directly instead of relying on the session's
+    // workspaceId, which can be absent or stale for an otherwise valid owner.
+    if (user.role === "super_admin") return getWorkspace(user, workspaceSlug);
+
+    const workspace = await WorkspaceModel.findOne({
+        $or: [{ slug: workspaceSlug }, { _id: workspaceSlug }],
+        ownerId: user.id,
+    }).lean().exec();
+    if (!workspace) throw forbiddenError("Only the workspace owner can access Knowledge Base data.");
+    return {
+        ...workspace,
+        id: String(workspace._id),
+    };
 };
 
 const scopedSession = async (user: AuthenticatedUserContext, workspaceSlug: string, sessionId: string) => {
