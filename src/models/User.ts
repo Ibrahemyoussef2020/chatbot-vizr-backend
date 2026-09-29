@@ -7,7 +7,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
+  role?: UserRole;
   workspaceId?: Types.ObjectId;
   securityRoleId?: Types.ObjectId;
   isActive: boolean;
@@ -18,7 +18,7 @@ const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ["super_admin", "admin", "agent"], default: "admin", index: true },
+  role: { type: String, enum: ["super_admin", "admin", "agent"], default: undefined, index: true },
   workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", index: true },
   securityRoleId: { type: Schema.Types.ObjectId, ref: "SecurityRole", index: true },
   isActive: { type: Boolean, default: true, index: true },

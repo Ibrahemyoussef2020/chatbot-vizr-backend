@@ -15,7 +15,7 @@ interface RegisterResult {
         id: unknown;
         name: string;
         email: string;
-        role: "admin";
+        role?: "admin";
         workspaceId: unknown;
     };
     accessToken: string;
@@ -62,7 +62,6 @@ const registerService = async ({ name, email, password }: RegisterInput): Promis
     return {
         userInfo: {
             ...tokenPayload,
-            role: "admin",
             workspaceId: workspace._id,
         },
         accessToken,

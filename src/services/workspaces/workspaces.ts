@@ -9,7 +9,7 @@ export interface AuthenticatedUserContext {
     id: string;
     name: string;
     email: string;
-    role: UserRole;
+    role?: UserRole;
     workspaceId?: string;
     securityRoleId?: string;
     securityRoleCode?: string;
@@ -39,10 +39,7 @@ export const createInitialWorkspace = async (userId: Types.ObjectId, userName: s
         ownerId: userId,
     });
 
-    await User.findByIdAndUpdate(userId, {
-        role: "admin",
-        workspaceId: workspace._id,
-    });
+    await User.findByIdAndUpdate(userId, { workspaceId: workspace._id });
     await ensureWorkspaceChannelDefaults(workspace._id);
 
     return workspace;
@@ -51,7 +48,7 @@ export const createInitialWorkspace = async (userId: Types.ObjectId, userName: s
 export const ensureUserWorkspace = async (user: {
     _id: Types.ObjectId;
     name: string;
-    role: UserRole;
+    role?: UserRole;
     workspaceId?: Types.ObjectId;
 }) => {
     if (user.role === "super_admin" || user.workspaceId) return user.workspaceId;

@@ -12,7 +12,7 @@ export interface UserLoginInput {
 
 export interface LoginResult {
     userInfo: UserTokenPayload & {
-        role: string;
+        role?: string;
         workspaceId?: unknown;
         permissions?: string[];
     };
