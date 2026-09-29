@@ -4,6 +4,16 @@ import { CloudinaryError, HttpError, PaymentError, QuotaExceededError, Validatio
 const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     console.error("[ERROR HANDLER CAUGHT]:", err);
 
+    // Do not expose Mongo/Mongoose connection and buffering details to users.
+    // Keep the original error in server logs and present a retryable response.
+    if (err instanceof Error && /buffering timed out|server selection timed out|MongoServerSelectionError/i.test(err.message)) {
+        return res.status(503).json({
+            message: "The service is temporarily unavailable. Please try again shortly.",
+            status: 503,
+            retryable: true,
+        });
+    }
+
     if (err instanceof ValidationError) {
         return res.status(err.status).json({
             message: err.message,

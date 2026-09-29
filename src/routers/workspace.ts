@@ -23,8 +23,9 @@ import {
     knowledgeBaseController,
     channelJobsController,
     aiManagementController,
+    userController,
 } from "../controllers/index.js";
-import { authenticate, requirePermission, requireWorkspaceOwner, validateRequest } from "../middlewares/index.js";
+import { authenticate, requirePermission, requireSuperAdmin, requireWorkspaceOwner, validateRequest } from "../middlewares/index.js";
 import { createWorkspaceValidator, updateWorkspaceValidator } from "../validator/index.js";
 
 const workspaceRouter = Router();
@@ -61,9 +62,10 @@ workspaceRouter.get("/channel-jobs/failed", channelJobsController.failed);
 workspaceRouter.post("/channel-jobs/:id/retry", channelJobsController.retry);
 
 // Workspace Systems
-workspaceRouter.get("/systems-list", workspaceController.list);
+workspaceRouter.get("/systems-list", requireSuperAdmin, workspaceController.list);
 workspaceRouter.post(
     "/systems-mgmt",
+    requireSuperAdmin,
     createWorkspaceValidator,
     validateRequest,
     workspaceController.store,
@@ -168,6 +170,9 @@ workspaceRouter.post("/gmail/test-message", gmailController.testMessage);
 
 // Knowledge Base data, including customer-conversation retrieval, is owner-only.
 workspaceRouter.use("/knowledge", requireWorkspaceOwner);
+workspaceRouter.get("/users", requirePermission("workspace.settings.manage"), userController.getWorkspaceUsers);
+workspaceRouter.post("/users", requirePermission("workspace.settings.manage"), userController.createWorkspaceUser);
+workspaceRouter.patch("/users/:id/role", requirePermission("workspace.settings.manage"), userController.assignWorkspaceUserRole);
 // Knowledge Base sessions, sources, and grounded chat
 workspaceRouter.get("/knowledge/outputs/saved", knowledgeBaseController.listSavedOutputs);
 workspaceRouter.get("/knowledge/sessions", knowledgeBaseController.listSessions);
@@ -211,13 +216,14 @@ workspaceRouter.delete("/security/roles/:id", securityRoleController.deleteRole)
 workspaceRouter.get("/security/permissions", securityRoleController.getPermissions);
 
 // Workspace System Details
-workspaceRouter.get("/systems-mgmt/:workspace", workspaceController.get);
+workspaceRouter.get("/systems-mgmt/:workspace", requireSuperAdmin, workspaceController.get);
 workspaceRouter.put(
     "/systems-mgmt/:workspace",
+    requireSuperAdmin,
     updateWorkspaceValidator,
     validateRequest,
     workspaceController.edit,
 );
-workspaceRouter.delete("/systems-mgmt/:workspace", workspaceController.remove);
+workspaceRouter.delete("/systems-mgmt/:workspace", requireSuperAdmin, workspaceController.remove);
 
 export default workspaceRouter;

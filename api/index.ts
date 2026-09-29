@@ -9,6 +9,11 @@ export default async function handler(req: any, res: any) {
         await connectDB();
     } catch (err) {
         console.error("[Vercel Handler] DB error:", err);
+        return res.status(503).json({
+            message: "The service is temporarily unavailable. Please try again shortly.",
+            status: 503,
+            retryable: true,
+        });
     }
 
     return app(req, res);
