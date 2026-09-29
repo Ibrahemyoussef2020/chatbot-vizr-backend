@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { AIAgent, AIModel, AIProvider, AIQuotaPolicy, AIRequestLog, AIRoutingPolicy, SecurityRole } from "../models/index.js";
-import { workspacePermissionIds } from "../core/security/permission.registry.js";
 import { providerDefinitions } from "../core/ai-management/provider.registry.js";
 
 const catalogs: Record<string, string[]> = {
@@ -29,7 +28,20 @@ export const seedAIManagement = async (workspaces: any[]) => {
     for (const [code, ids] of Object.entries(catalogs)) for (let i = 0; i < ids.length; i++) { const model = await AIModel.findOneAndUpdate({ providerId: providers.get(code)._id, externalId: ids[i] }, { $set: { displayName: ids[i].split("/").pop(), alias: `${code}-${i + 1}`, enabled: true, priority: (i + 1) * 10, contextWindow: i === 0 ? 128000 : 64000, maxOutputTokens: 4096, capabilities: { text: true, vision: i === 1, tools: i !== 2, streaming: true, reasoning: i === 2 } } }, { upsert: true, new: true }); models.push(model); }
     let agentsCount = 0; let logsCount = 0;
     for (const ws of workspaces) {
-        const role = await SecurityRole.findOneAndUpdate({ workspaceId: ws._id, code: "ai_operator" }, { $set: { name: "AI Operator", description: "Shared role usable by human and AI principals.", scope: "workspace", isSystem: false, permissions: workspacePermissionIds.filter((p) => p.startsWith("knowledge.") || p.startsWith("inbox.") || p === "analytics.view") } }, { upsert: true, new: true });
+        const role = await SecurityRole.findOneAndUpdate(
+            { workspaceId: ws._id, code: "workspace_agent" },
+            {
+                $set: {
+                    name: "Workspace Agent",
+                    description: "Can view the inbox, reply to assigned conversations, manage status, and add internal notes.",
+                    scope: "workspace",
+                    isSystem: true,
+                    permissions: ["inbox.view", "inbox.reply_assigned", "inbox.status.manage", "inbox.notes.manage"],
+                },
+                $setOnInsert: { workspaceId: ws._id },
+            },
+            { upsert: true, new: true },
+        );
         const agents: any[] = [];
         for (let i = 0; i < agentTemplates.length; i++) { const [name, slug, prompt] = agentTemplates[i]; const agent = await AIAgent.findOneAndUpdate({ workspaceId: ws._id, slug }, { $set: { securityRoleId: role._id, name, description: prompt, systemPrompt: `${prompt} Be concise, accurate and use tools only when permitted by your assigned security role.`, primaryModelId: models[i % models.length]._id, fallbackModelIds: [models[(i + 1) % models.length]._id, models[(i + 2) % models.length]._id], channels: ["web", i % 2 ? "telegram" : "whatsapp"], tools: ["knowledge-search", "conversation-context"], temperature: 0.25 + i * .08, maxOutputTokens: 1000 + i * 200, timeoutMs: 30000 + i * 3000, enabled: true } }, { upsert: true, new: true }); agents.push(agent); agentsCount++; }
         for (let i = 0; i < agents.length; i++) await AIRoutingPolicy.findOneAndUpdate({ workspaceId: ws._id, name: `${agents[i].name} Routing` }, { $set: { agentId: agents[i]._id, strategy: i % 2 ? "priority" : "quota_aware", enabled: true, modelIds: [agents[i].primaryModelId, ...agents[i].fallbackModelIds], maxRetries: 2, timeoutMs: agents[i].timeoutMs } }, { upsert: true });
