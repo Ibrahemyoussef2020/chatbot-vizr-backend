@@ -1,4 +1,5 @@
 import type { ModelMessage } from "ai";
+import { Types } from "mongoose";
 import { KnowledgeFileProcessorFactory } from "../../core/knowledge/file-processor.factory.js";
 import { forbiddenError, notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
 import { AIConfig, Conversation, KnowledgeChatMessage, KnowledgeOutput, KnowledgeOutputSection, KnowledgeSession, KnowledgeSource, KnowledgeUpload, Message, Workspace } from "../../models/index.js";
@@ -25,8 +26,10 @@ const ownerWorkspace = async (user: AuthenticatedUserContext, workspaceSlug: str
     // workspaceId, which can be absent or stale for an otherwise valid owner.
     if (user.role === "super_admin") return getWorkspace(user, workspaceSlug);
 
+    const identifiers = [{ slug: workspaceSlug }];
+    if (Types.ObjectId.isValid(workspaceSlug)) identifiers.push({ _id: workspaceSlug } as any);
     const workspace = await WorkspaceModel.findOne({
-        $or: [{ slug: workspaceSlug }, { _id: workspaceSlug }],
+        $or: identifiers,
         ownerId: user.id,
     }).lean().exec();
     if (!workspace) throw forbiddenError("Only the workspace owner can access Knowledge Base data.");
