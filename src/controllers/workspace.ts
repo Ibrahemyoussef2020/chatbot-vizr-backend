@@ -32,6 +32,11 @@ const show = async (req: Request, res: Response) => {
     });
 };
 
+const current = async (req: Request, res: Response) => {
+    const data = await workspaceService.getWorkspace(res.locals.user, String(res.locals.user.workspaceId || ""));
+    res.status(200).json({ data, message: "Workspace retrieved successfully" });
+};
+
 const update = async (req: Request, res: Response) => {
     const data = await workspaceService.updateWorkspace(
         res.locals.user,
@@ -60,5 +65,6 @@ const deactivate = async (req: Request, res: Response) => {
 export const list = asyncHandler(index);
 export const store = asyncHandler(create);
 export const get = asyncHandler(show);
+export const currentWorkspace = asyncHandler(current);
 export const edit = asyncHandler(update);
 export const remove = asyncHandler(deactivate);

@@ -54,6 +54,7 @@ workspaceRouter.put("/payment-methods/:provider", businessPaymentMethods.update)
 workspaceRouter.get("/payments", requirePermission("payments.view"), businessPayments.index);
 workspaceRouter.get("/payments/:id", requirePermission("payments.view"), businessPayments.show);
 workspaceRouter.post("/payments/:id/decision", businessPayments.decidePayment);
+workspaceRouter.get("/workspace", workspaceController.currentWorkspace);
 workspaceRouter.get("/pricings", requirePermission("plans.manage"), businessPlans.index);
 workspaceRouter.post("/pricings", requirePermission("plans.manage"), businessPlans.create);
 workspaceRouter.put("/pricings/:id", requirePermission("plans.manage"), businessPlans.update);
