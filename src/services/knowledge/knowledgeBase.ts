@@ -26,6 +26,10 @@ const ownerWorkspace = async (user: AuthenticatedUserContext, workspaceSlug: str
     // workspaceId, which can be absent or stale for an otherwise valid owner.
     if (user.role === "super_admin") return getWorkspace(user, workspaceSlug);
 
+    if (user.permissions?.includes("knowledge.use") || user.permissions?.includes("inbox.view")) {
+        return getWorkspace(user, workspaceSlug);
+    }
+
     const identifiers = [{ slug: workspaceSlug }];
     if (Types.ObjectId.isValid(workspaceSlug)) identifiers.push({ _id: workspaceSlug } as any);
     const workspace = await WorkspaceModel.findOne({

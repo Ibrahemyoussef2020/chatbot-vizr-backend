@@ -13,7 +13,10 @@ const requireWorkspaceOwner = async (req: Request, res: Response, next: NextFunc
             : { slug: requested };
         const workspace = await Workspace.findOne(selector).select("ownerId").lean().exec();
         if (!workspace) throw notFoundError("Workspace not found.");
-        if (String(workspace.ownerId) !== String(user.id)) throw forbiddenError("Only the workspace owner can access customer conversations and Knowledge Base data.");
+        const canAccessWorkspaceData = String(workspace.ownerId) === String(user.id)
+            || user.permissions?.includes("inbox.view")
+            || user.permissions?.includes("knowledge.use");
+        if (!canAccessWorkspaceData) throw forbiddenError("Your role cannot access customer conversations or Knowledge Base data.");
         next();
     } catch (error) {
         next(error);
