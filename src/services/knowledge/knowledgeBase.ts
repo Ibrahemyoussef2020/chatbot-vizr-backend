@@ -192,10 +192,9 @@ export const askKnowledgeBase = async (user: AuthenticatedUserContext, workspace
         systemSlug: workspaceSlug,
         channel: "web",
         modelId: session.selectedModelId ? String(session.selectedModelId) : undefined,
+        providerName: process.env.DEFAULT_AI_PROVIDER || "openai",
+        modelName: process.env.DEFAULT_AI_MODEL || process.env.OPENAI_MODEL,
     });
-    if (!execution.agentId) {
-        throw unprocessableEntityError("Select a managed default agent for this workspace before using Knowledge conversation.");
-    }
     const history: ModelMessage[] = [{ role: "user", content: question.trim() }];
     const answer = await generateAIReply(
         execution,
