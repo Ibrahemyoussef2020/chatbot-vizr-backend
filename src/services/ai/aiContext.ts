@@ -5,7 +5,7 @@ import KnowledgeSource from "../../models/KnowledgeSource.js";
 import Message from "../../models/Message.js";
 import { notFoundError } from "../../core/shared/errors/HttpError.js";
 import { boundChatHistory, relevantKnowledgeExcerpt } from "../../core/replies/ai-reply.policy.js";
-import { resolveAIExecutionConfig, type AIExecutionConfig } from "./aiExecution.js";
+import { queueEnabledModelFallbacks, resolveAIExecutionConfig, type AIExecutionConfig } from "./aiExecution.js";
 import type { AiReplyInput } from "../../core/replies/reply.types.js";
 
 export const serializeStructuredKnowledge = (value: unknown, maxChars = 8000) => {
@@ -65,7 +65,7 @@ export const prepareAIConversation = async (input: AiReplyInput) => {
         receivedFrom: input.channel,
     });
     if (!conversation) throw notFoundError("Conversation not found in this workspace and channel.");
-    const execution = await resolveAIExecutionConfig(input);
+    const execution = await queueEnabledModelFallbacks(await resolveAIExecutionConfig(input));
     const inbound = await Message.findOne({
         _id: input.inboundMessageId,
         senderType: "visitor",

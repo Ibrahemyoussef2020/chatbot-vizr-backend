@@ -75,6 +75,25 @@ export const resolveExecutionModel = async (id: string): Promise<ExecutionModel>
     };
 };
 
+export const queueEnabledModelFallbacks = async (execution: AIExecutionConfig): Promise<AIExecutionConfig> => {
+    const queuedModels = await AIModel.find({ enabled: true, "capabilities.text": { $ne: false } })
+        .sort({ priority: 1, _id: 1 }).select("_id").lean().exec();
+    const configuredIds = new Set(execution.models.map(model => model.id));
+    for (const candidate of queuedModels) {
+        const id = String(candidate._id);
+        if (configuredIds.has(id)) continue;
+        try {
+            const model = await resolveExecutionModel(id);
+            execution.models.push(model);
+            configuredIds.add(id);
+        } catch {
+            // Skip disabled or unavailable providers and continue the queue.
+        }
+    }
+    execution.options.maxRetries = Math.max(0, execution.models.length - 1);
+    return execution;
+};
+
 export const resolveAIExecutionConfig = async (input: {
     systemSlug: string;
     channel: string;
