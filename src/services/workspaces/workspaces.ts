@@ -12,6 +12,7 @@ export interface AuthenticatedUserContext {
     role: UserRole;
     workspaceId?: string;
     securityRoleId?: string;
+    securityRoleCode?: string;
     permissions?: string[];
 }
 

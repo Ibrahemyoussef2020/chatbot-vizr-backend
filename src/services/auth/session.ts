@@ -6,6 +6,14 @@ import { ensureUserWorkspace } from "../workspaces/workspaces.js";
 import SecurityRole from "../../models/SecurityRole.js";
 import { businessPermissionIds, workspacePermissionIds } from "../../core/security/permission.registry.js";
 
+const systemRolePermissions = (code: string) => {
+    if (code === "business_owner") return businessPermissionIds;
+    if (code === "business_admin") return businessPermissionIds.filter((permission) => !["business.manage", "plans.manage", "workspaces.create"].includes(permission));
+    if (code === "workspace_owner") return workspacePermissionIds;
+    if (code === "workspace_admin") return workspacePermissionIds.filter((permission) => !["billing.manage", "workspace.permissions.assign"].includes(permission));
+    return null;
+};
+
 interface SessionInput {
     refreshToken?: string;
     accessToken?: string;
@@ -61,12 +69,13 @@ const getSessionService = async ({ refreshToken, accessToken, optional = false }
         user.securityRoleId = securityRole._id;
         await user.save();
     }
-    const synchronizedPermissions = securityRole.code === "business_owner"
-        ? businessPermissionIds
-        : securityRole.code === "workspace_owner"
-            ? workspacePermissionIds
-            : securityRole.permissions;
-    if (securityRole.isSystem && synchronizedPermissions.some((permission) => !securityRole!.permissions.includes(permission))) {
+    const synchronizedPermissions = securityRole.isSystem
+        ? (systemRolePermissions(securityRole.code) || securityRole.permissions)
+        : securityRole.permissions;
+    if (securityRole.isSystem && (
+        synchronizedPermissions.length !== securityRole.permissions.length
+        || synchronizedPermissions.some((permission, index) => permission !== securityRole!.permissions[index])
+    )) {
         securityRole.permissions = synchronizedPermissions;
         await securityRole.save();
     }
@@ -79,6 +88,7 @@ const getSessionService = async ({ refreshToken, accessToken, optional = false }
             role: user.role,
             workspaceId,
             securityRoleId: securityRole._id,
+            securityRoleCode: securityRole.code,
             permissions: synchronizedPermissions,
         },
     };
