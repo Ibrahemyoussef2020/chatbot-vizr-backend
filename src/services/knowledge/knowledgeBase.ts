@@ -2,10 +2,10 @@ import type { ModelMessage } from "ai";
 import { Types } from "mongoose";
 import { KnowledgeFileProcessorFactory } from "../../core/knowledge/file-processor.factory.js";
 import { forbiddenError, notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
-import { AIConfig, Conversation, KnowledgeChatMessage, KnowledgeOutput, KnowledgeOutputSection, KnowledgeSession, KnowledgeSource, KnowledgeUpload, Message, Workspace } from "../../models/index.js";
+import { AIConfig, AIModel, Conversation, KnowledgeChatMessage, KnowledgeOutput, KnowledgeOutputSection, KnowledgeSession, KnowledgeSource, KnowledgeUpload, Message, Workspace } from "../../models/index.js";
 import { relevantKnowledgeExcerpt } from "../../core/replies/ai-reply.policy.js";
 import { serializeStructuredKnowledge } from "../ai/aiContext.js";
-import { generateAIReply, resolveAIExecutionConfig } from "../ai/aiExecution.js";
+import { generateAIReply, resolveAIExecutionConfig, resolveExecutionModel } from "../ai/aiExecution.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
 import { getWorkspace } from "../workspaces/workspaces.js";
 
@@ -209,6 +209,25 @@ export const askKnowledgeBase = async (user: AuthenticatedUserContext, workspace
         providerName: process.env.DEFAULT_AI_PROVIDER || "openai",
         modelName: process.env.DEFAULT_AI_MODEL || process.env.OPENAI_MODEL,
     });
+    // Knowledge Base is interactive and should survive a provider/model
+    // outage. Keep the workspace agent's configured order first, then append
+    // every other enabled text model as a fallback queue.
+    const queuedModels = await AIModel.find({ enabled: true, "capabilities.text": { $ne: false } })
+        .sort({ priority: 1, _id: 1 }).select("_id").lean().exec();
+    const configuredIds = new Set(execution.models.map(model => model.id));
+    for (const candidate of queuedModels) {
+        const id = String(candidate._id);
+        if (configuredIds.has(id)) continue;
+        try {
+            const model = await resolveExecutionModel(id);
+            execution.models.push(model);
+            configuredIds.add(id);
+        } catch {
+            // Disabled/misconfigured providers are skipped; the execution
+            // loop will continue through the remaining healthy candidates.
+        }
+    }
+    execution.options.maxRetries = Math.max(0, execution.models.length - 1);
     const history: ModelMessage[] = [{ role: "user", content: question.trim() }];
     const answer = await generateAIReply(
         execution,
