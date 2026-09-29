@@ -7,6 +7,8 @@ import {
     AIRequestLog,
     AIRoutingPolicy,
     SecurityRole,
+    Plan,
+    Subscription,
     Workspace,
 } from "../../models/index.js";
 import {
@@ -14,6 +16,8 @@ import {
     notFoundError,
     unprocessableEntityError,
 } from "../../core/shared/errors/HttpError.js";
+import { resolvePlanAccess, FREE_PLAN_FALLBACK } from "../../core/plans/plan-resolver.js";
+import QuotaExceededError from "../../core/shared/errors/QuotaExceededError.js";
 import { ensureDefaults } from "../auth/securityRole.js";
 import {
     hasProviderCredentials,
@@ -151,6 +155,18 @@ const assertGlobalAIManagement = (user: AuthenticatedUserContext, permission: st
     }
 };
 
+const assertWorkspacePlanCount = async (user: AuthenticatedUserContext, workspaceId: string, metric: "ai.agents.max" | "ai.quotas.max", model: typeof AIAgent | typeof AIQuotaPolicy) => {
+    if (user.role === "super_admin") return;
+    const workspace = await Workspace.findById(workspaceId).select("selectedPlanCode").lean();
+    const subscription = await Subscription.findOne({ workspaceId, status: { $in: ["trialing", "active"] }, currentPeriodEnd: { $gt: new Date() } }).lean();
+    const plan = workspace?.selectedPlanCode ? await Plan.findOne({ code: workspace.selectedPlanCode }).lean() : null;
+    const access = plan ? resolvePlanAccess(plan as any, subscription as any) : FREE_PLAN_FALLBACK;
+    const limit = access.quotas[metric];
+    if (limit < 0) return;
+    const used = await model.countDocuments({ workspaceId } as any);
+    if (used >= limit) throw new QuotaExceededError({ metric, used, limit, window: "total", retryAfterSeconds: 0 });
+};
+
 export const updateAIProviderService = async (id: string, input: any, user: AuthenticatedUserContext) => {
     assertGlobalAIManagement(user, "ai.providers.manage");
     const changes: Record<string, boolean | number> = {};
@@ -254,7 +270,6 @@ export const listAIAgentsService = async (
     slug?: string,
 ) => {
     const workspace = await resolveWorkspace(user, slug);
-
     return AIAgent.find({ workspaceId: workspace._id })
         .populate("securityRoleId", "name code permissions")
         .populate("primaryModelId", "displayName externalId")
@@ -269,6 +284,7 @@ export const saveAIAgentService = async (
     id?: string,
 ) => {
     const workspace = await resolveWorkspace(user, slug);
+    if (!id) await assertWorkspacePlanCount(user, String(workspace._id), "ai.agents.max", AIAgent);
 
     const previous = id
         ? await AIAgent.findOne({ _id: id, workspaceId: workspace._id }).lean()
@@ -537,6 +553,7 @@ export const saveAIQuotaService = async (
     id?: string,
 ) => {
     const workspace = await resolveWorkspace(user, slug);
+    if (!id) await assertWorkspacePlanCount(user, String(workspace._id), "ai.quotas.max", AIQuotaPolicy);
     const previous = id ? await AIQuotaPolicy.findOne({ _id: id, workspaceId: workspace._id }).lean() : undefined;
     if (id && !previous) throw notFoundError("Quota policy not found.");
     input = parseAIInput(quotaInputSchema, {
