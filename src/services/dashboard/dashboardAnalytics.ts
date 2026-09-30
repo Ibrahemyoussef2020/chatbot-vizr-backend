@@ -1,4 +1,5 @@
 import Conversation from "../../models/Conversation.js";
+import Message from "../../models/Message.js";
 import Workspace from "../../models/Workspace.js";
 import { forbiddenError, notFoundError } from "../../core/shared/errors/HttpError.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
@@ -53,7 +54,7 @@ export const getThreadAnalytics = async (
         createdAt: { $gte: startDate },
     };
 
-    const [rawTimeSeries, totalInPeriod, activeInPeriod, endedInPeriod, hourlyAggregate] = await Promise.all([
+    const [rawTimeSeries, totalInPeriod, activeInPeriod, endedInPeriod, hourlyAggregate, channelAggregate, topicAggregate] = await Promise.all([
         Conversation.aggregate([
             { $match: matchScope },
             {
@@ -85,10 +86,35 @@ export const getThreadAnalytics = async (
             },
             { $sort: { _id: 1 } },
         ]),
+        Message.aggregate([
+            { $match: { createdAt: { $gte: startDate } } },
+            { $lookup: { from: "conversations", localField: "conversationId", foreignField: "_id", as: "conversation" } },
+            { $unwind: "$conversation" },
+            { $match: conversationScope.systemSlug ? { "conversation.systemSlug": conversationScope.systemSlug } : {} },
+            { $group: { _id: "$receivedFrom", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+        ]),
+        Conversation.aggregate([
+            { $match: matchScope },
+            { $unwind: { path: "$tags", preserveNullAndEmptyArrays: true } },
+            { $group: { _id: { $ifNull: ["$tags", "Uncategorized"] }, count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 8 },
+        ]),
     ]);
 
-    const channelBreakdown: Array<{ name: string; count: number; sharePercent: number }> = [];
-    const topicBreakdown: Array<{ topic: string; count: number; sharePercent: number }> = [];
+    const messageTotal = channelAggregate.reduce((sum, item) => sum + item.count, 0);
+    const channelBreakdown = channelAggregate.map((item) => ({
+        name: item._id || "web",
+        count: item.count,
+        sharePercent: messageTotal ? Math.round((item.count / messageTotal) * 100) : 0,
+    }));
+    const topicTotal = topicAggregate.reduce((sum, item) => sum + item.count, 0);
+    const topicBreakdown = topicAggregate.map((item) => ({
+        topic: item._id || "Uncategorized",
+        count: item.count,
+        sharePercent: topicTotal ? Math.round((item.count / topicTotal) * 100) : 0,
+    }));
 
     const totalCalculated = totalInPeriod;
     const automatedPercent = totalCalculated > 0 ? Math.round((endedInPeriod / totalCalculated) * 100) : 0;

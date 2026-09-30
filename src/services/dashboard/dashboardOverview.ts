@@ -50,7 +50,7 @@ export const getOverview = async (
     const conversationScope = systemSlug ? { systemSlug } : {};
     const recentSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [total, active, ended, recent, conversations, tokenLogsCount, tagCount, hourlyAggregate, rawTimeSeries] = await Promise.all([
+    const [total, active, ended, recent, conversations, tokenLogsCount, tagCount, hourlyAggregate, rawTimeSeries, channelAggregate, topicAggregate] = await Promise.all([
         Conversation.countDocuments(conversationScope),
         Conversation.countDocuments({ ...conversationScope, status: "active" }),
         Conversation.countDocuments({ ...conversationScope, status: "ended" }),
@@ -71,6 +71,21 @@ export const getOverview = async (
                 },
             },
             { $sort: { _id: 1 } },
+        ]),
+        Message.aggregate([
+            { $match: { createdAt: { $gte: recentSince } } },
+            { $lookup: { from: "conversations", localField: "conversationId", foreignField: "_id", as: "conversation" } },
+            { $unwind: "$conversation" },
+            { $match: systemSlug ? { "conversation.systemSlug": systemSlug } : {} },
+            { $group: { _id: "$receivedFrom", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+        ]),
+        Conversation.aggregate([
+            { $match: { ...conversationScope, createdAt: { $gte: recentSince } } },
+            { $unwind: { path: "$tags", preserveNullAndEmptyArrays: true } },
+            { $group: { _id: { $ifNull: ["$tags", "Uncategorized"] }, count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 8 },
         ]),
         Conversation.aggregate([
             { $match: { ...conversationScope, createdAt: { $gte: recentSince } } },
@@ -154,8 +169,8 @@ export const getOverview = async (
             crmTags: tagCount,
         },
         time_series: timeSeries,
-        channels: [],
-        topics: [],
+        channels: (() => { const totalMessages = channelAggregate.reduce((sum, item) => sum + item.count, 0); return channelAggregate.map((item) => ({ name: item._id || "web", count: item.count, sharePercent: totalMessages ? Math.round((item.count / totalMessages) * 100) : 0 })); })(),
+        topics: (() => { const totalTopics = topicAggregate.reduce((sum, item) => sum + item.count, 0); return topicAggregate.map((item) => ({ topic: item._id || "Uncategorized", count: item.count, sharePercent: totalTopics ? Math.round((item.count / totalTopics) * 100) : 0 })); })(),
         hourly_activity: hourlyActivity,
         recent_threads: conversations.map((conversation) => ({
             id: conversation.publicId,
