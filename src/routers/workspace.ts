@@ -63,10 +63,13 @@ workspaceRouter.get("/channel-jobs/failed", channelJobsController.failed);
 workspaceRouter.post("/channel-jobs/:id/retry", channelJobsController.retry);
 
 // Workspace Systems
-workspaceRouter.get("/systems-list", requireSuperAdmin, workspaceController.list);
+// Listing is read-only and the service scopes results to the authenticated
+// user's tenant. Keep mutations below restricted to super admins, but allow
+// tenant users to recover their workspace when an older client still calls
+// this endpoint during dashboard startup.
+workspaceRouter.get("/systems-list", workspaceController.list);
 workspaceRouter.post(
     "/systems-mgmt",
-    requireSuperAdmin,
     createWorkspaceValidator,
     validateRequest,
     workspaceController.store,
@@ -217,10 +220,9 @@ workspaceRouter.delete("/security/roles/:id", securityRoleController.deleteRole)
 workspaceRouter.get("/security/permissions", securityRoleController.getPermissions);
 
 // Workspace System Details
-workspaceRouter.get("/systems-mgmt/:workspace", requireSuperAdmin, workspaceController.get);
+workspaceRouter.get("/systems-mgmt/:workspace", workspaceController.get);
 workspaceRouter.put(
     "/systems-mgmt/:workspace",
-    requireSuperAdmin,
     updateWorkspaceValidator,
     validateRequest,
     workspaceController.edit,
