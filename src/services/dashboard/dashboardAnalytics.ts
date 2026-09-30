@@ -138,9 +138,22 @@ export const getThreadAnalytics = async (
         });
     }
 
-    const fullDateWindow = generateDateWindow(days);
+    const chartTimeSeries = rawTimeSeries.length || totalInPeriod > 0
+        ? rawTimeSeries
+        : await Conversation.aggregate([
+            { $match: conversationScope },
+            { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, total: { $sum: 1 }, open: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } }, closed: { $sum: { $cond: [{ $eq: ["$status", "ended"] }, 1, 0] } } } },
+            { $sort: { _id: -1 } },
+            { $limit: days },
+            { $sort: { _id: 1 } },
+        ]);
+
+    const fullDateWindow = chartTimeSeries.length && !rawTimeSeries.length
+        ? generateDateWindow(days).flatMap((_, index) => chartTimeSeries[index]?._id ? [chartTimeSeries[index]._id] : [])
+        : generateDateWindow(days);
+    const chartTimeSeriesMap = new Map(chartTimeSeries.map((item) => [item._id, item]));
     const timeSeries = fullDateWindow.map((dateStr) => {
-        const found = timeSeriesMap.get(dateStr);
+        const found = chartTimeSeriesMap.get(dateStr) || timeSeriesMap.get(dateStr);
         return {
             date: dateStr,
             total: found ? found.total : 0,
