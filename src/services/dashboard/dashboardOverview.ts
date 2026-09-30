@@ -72,12 +72,9 @@ export const getOverview = async (
             },
             { $sort: { _id: 1 } },
         ]),
-        Message.aggregate([
-            { $match: { createdAt: { $gte: recentSince } } },
-            { $lookup: { from: "conversations", localField: "conversationId", foreignField: "_id", as: "conversation" } },
-            { $unwind: "$conversation" },
-            { $match: systemSlug ? { "conversation.systemSlug": systemSlug } : {} },
-            { $group: { _id: "$receivedFrom", count: { $sum: 1 } } },
+        Conversation.aggregate([
+            { $match: { ...conversationScope, createdAt: { $gte: recentSince } } },
+            { $group: { _id: { $ifNull: ["$receivedFrom", "web"] }, count: { $sum: 1 } } },
             { $sort: { count: -1 } },
         ]),
         Conversation.aggregate([

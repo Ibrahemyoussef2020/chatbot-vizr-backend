@@ -1,5 +1,4 @@
 import Conversation from "../../models/Conversation.js";
-import Message from "../../models/Message.js";
 import Workspace from "../../models/Workspace.js";
 import { forbiddenError, notFoundError } from "../../core/shared/errors/HttpError.js";
 import type { AuthenticatedUserContext } from "../workspaces/workspaces.js";
@@ -86,12 +85,9 @@ export const getThreadAnalytics = async (
             },
             { $sort: { _id: 1 } },
         ]),
-        Message.aggregate([
-            { $match: { createdAt: { $gte: startDate } } },
-            { $lookup: { from: "conversations", localField: "conversationId", foreignField: "_id", as: "conversation" } },
-            { $unwind: "$conversation" },
-            { $match: conversationScope.systemSlug ? { "conversation.systemSlug": conversationScope.systemSlug } : {} },
-            { $group: { _id: "$receivedFrom", count: { $sum: 1 } } },
+        Conversation.aggregate([
+            { $match: matchScope },
+            { $group: { _id: { $ifNull: ["$receivedFrom", "web"] }, count: { $sum: 1 } } },
             { $sort: { count: -1 } },
         ]),
         Conversation.aggregate([
