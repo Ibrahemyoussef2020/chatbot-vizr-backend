@@ -3,7 +3,7 @@ import "../../core/payments/payment.strategies.js";
 import { PaymentGatewayFactory } from "../../core/payments/payment-gateway.factory.js";
 import type { GatewayConfig } from "../../core/payments/payment.types.js";
 import { notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
-import { PaymentTransaction, Subscription } from "../../models/index.js";
+import { PaymentTransaction, Subscription, Workspace } from "../../models/index.js";
 import { getEffectivePaymentMethodConfig } from "./paymentMethodConfig.js";
 
 export const handleStripeWebhook = async (rawBody: Buffer, headers: IncomingHttpHeaders) => {
@@ -58,6 +58,7 @@ export const handleStripeWebhook = async (rawBody: Buffer, headers: IncomingHttp
     await transaction.save();
 
     if (event.status === "succeeded" && transaction.workspaceId) {
+        await Workspace.findByIdAndUpdate(transaction.workspaceId, { $set: { isActive: true, selectedPlanCode: transaction.planCode } }).exec();
         const start = new Date();
         const end = new Date(start);
         if (transaction.billingCycle === "yearly") end.setFullYear(end.getFullYear() + 1);

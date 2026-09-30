@@ -101,6 +101,12 @@ export const subscribeToPlan = async (input: SubscriptionInput, user?: Authentic
         payerFields: result.payerFields || {},
     });
 
+    // Paid workspaces remain visible to their owner, but cannot use the
+    // dashboard until the payment is confirmed by the platform.
+    if (subscriptionWorkspaceId) {
+        await Workspace.findByIdAndUpdate(subscriptionWorkspaceId, { $set: { isActive: false } }).exec();
+    }
+
     return {
         success: true,
         message: `Checkout created for ${plan.name} (${billingCycle})`,
@@ -156,6 +162,9 @@ export const startFreeSubscription = async (
         },
         { upsert: true, new: true, runValidators: true },
     ).exec();
+
+    workspace.isActive = true;
+    await workspace.save();
 
     return { planCode: plan.code, status: subscription.status, currentPeriodEnd: subscription.currentPeriodEnd };
 };

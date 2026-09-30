@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import { forbiddenError, notFoundError, unprocessableEntityError } from "../../core/shared/errors/HttpError.js";
 import User, { type UserRole } from "../../models/User.js";
 import Workspace from "../../models/Workspace.js";
+import { PaymentTransaction, Subscription } from "../../models/index.js";
 import { ensureWorkspaceChannelDefaults } from "../integrations/channelDefaults.js";
 
 export interface AuthenticatedUserContext {
@@ -116,8 +117,28 @@ const serialize = (workspace: {
 
 export const listWorkspaces = async (user: AuthenticatedUserContext) => {
     const workspaces = await Workspace.find(scope(user)).sort({ createdAt: -1 }).lean().exec();
+    const workspaceIds = workspaces.map((workspace) => workspace._id);
+    const [pendingWorkspaceIds, activeSubscriptionIds] = await Promise.all([
+        PaymentTransaction.distinct("workspaceId", {
+            workspaceId: { $in: workspaceIds },
+            status: { $in: ["pending", "awaiting_review", "succeeded"] },
+        }),
+        Subscription.distinct("workspaceId", {
+            workspaceId: { $in: workspaceIds },
+            status: { $in: ["trialing", "active"] },
+            currentPeriodEnd: { $gt: new Date() },
+        }),
+    ]);
+    const activeSubscriptionSet = new Set(activeSubscriptionIds.map(String));
+    const pendingWorkspaceSet = new Set(pendingWorkspaceIds.map(String));
 
-    return workspaces.map(serialize);
+    return workspaces.map((workspace) => serialize({
+        ...workspace,
+        // A pending payment is not an active workspace until a subscription
+        // exists or a platform administrator approves the payment.
+        isActive: workspace.isActive
+            && (!pendingWorkspaceSet.has(String(workspace._id)) || activeSubscriptionSet.has(String(workspace._id))),
+    }));
 };
 
 export const createWorkspace = async (
