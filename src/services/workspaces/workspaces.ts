@@ -38,6 +38,7 @@ export const createInitialWorkspace = async (userId: Types.ObjectId, userName: s
         name: `${userName}'s Workspace`,
         slug: await uniqueSlug(`${userName}-workspace`),
         ownerId: userId,
+        verificationStatus: "active",
     });
 
     await User.findByIdAndUpdate(userId, { workspaceId: workspace._id });
@@ -69,7 +70,7 @@ const scope = (user: AuthenticatedUserContext) => {
     // Business admins may own multiple workspaces. Keep their tenant scope
     // anchored to ownership so newly created workspaces are immediately
     // visible and editable instead of being limited to user.workspaceId.
-    if (user.role === "admin") {
+    if (user.role === "admin" || user.securityRoleCode === "business_owner") {
         return user.workspaceId
             ? { $or: [{ ownerId: user.id }, { _id: user.workspaceId }] }
             : { ownerId: user.id };
@@ -136,8 +137,11 @@ export const listWorkspaces = async (user: AuthenticatedUserContext) => {
         ...workspace,
         // A pending payment is not an active workspace until a subscription
         // exists or a platform administrator approves the payment.
-        isActive: workspace.isActive
-            && (!pendingWorkspaceSet.has(String(workspace._id)) || activeSubscriptionSet.has(String(workspace._id))),
+        isActive: workspace.verificationStatus === "processing"
+            ? false
+            : workspace.isActive && (workspace.verificationStatus === "active"
+                || !pendingWorkspaceSet.has(String(workspace._id))
+                || activeSubscriptionSet.has(String(workspace._id))),
     }));
 };
 
@@ -157,7 +161,7 @@ export const createWorkspace = async (
         rate_limit?: number;
     },
 ) => {
-    if (user.role !== "super_admin" && user.role !== "admin") {
+    if (user.role !== "super_admin" && user.role !== "admin" && user.securityRoleCode !== "business_owner") {
         throw forbiddenError("Only a business administrator can create workspaces");
     }
 
@@ -176,6 +180,7 @@ export const createWorkspace = async (
         ownerId: user.id,
         rateLimit: input.rate_limit ?? 60,
         isActive: true,
+        verificationStatus: "active",
     });
 
     await ensureWorkspaceChannelDefaults(workspace._id);
@@ -241,7 +246,11 @@ export const updateWorkspace = async (
     if (input.timezone !== undefined) changes.timezone = input.timezone.trim();
     if (input.currency !== undefined) changes.currency = input.currency.trim().toUpperCase();
     if (input.selected_plan_code !== undefined) changes.selectedPlanCode = input.selected_plan_code.trim().toLowerCase();
-    if (input.is_active !== undefined) changes.isActive = input.is_active;
+    if (input.is_active !== undefined) {
+        if (user.role !== "super_admin") throw forbiddenError("Only the platform administrator can change workspace verification status");
+        changes.isActive = input.is_active;
+        changes.verificationStatus = input.is_active ? "active" : "processing";
+    }
     if (input.rate_limit !== undefined) changes.rateLimit = input.rate_limit;
     if (!Object.keys(changes).length) throw unprocessableEntityError("No workspace changes were supplied");
 

@@ -58,7 +58,7 @@ export const handleStripeWebhook = async (rawBody: Buffer, headers: IncomingHttp
     await transaction.save();
 
     if (event.status === "succeeded" && transaction.workspaceId) {
-        await Workspace.findByIdAndUpdate(transaction.workspaceId, { $set: { isActive: true, selectedPlanCode: transaction.planCode } }).exec();
+        await Workspace.findByIdAndUpdate(transaction.workspaceId, { $set: { isActive: true, verificationStatus: "active", selectedPlanCode: transaction.planCode } }).exec();
         const start = new Date();
         const end = new Date(start);
         if (transaction.billingCycle === "yearly") end.setFullYear(end.getFullYear() + 1);

@@ -59,6 +59,7 @@ export const decideBusinessPayment = async (user: AuthenticatedUserContext, id: 
         if (workspace) {
             workspace.selectedPlanCode = payment.planCode;
             workspace.isActive = true;
+            workspace.verificationStatus = "active";
             await workspace.save();
 
             // Approval is also the point at which the customer account is

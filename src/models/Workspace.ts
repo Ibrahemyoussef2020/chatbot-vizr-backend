@@ -14,6 +14,7 @@ export interface IWorkspace extends Document {
     selectedPlanCode: string;
     ownerId: Types.ObjectId;
     isActive: boolean;
+    verificationStatus: "active" | "processing";
     rateLimit: number;
     webhookUrl?: string;
     defaultAiAgentId?: Types.ObjectId | null;
@@ -35,6 +36,7 @@ const WorkspaceSchema = new Schema<IWorkspace>(
         selectedPlanCode: { type: String, default: "", trim: true, lowercase: true, maxlength: 120 },
         ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
         isActive: { type: Boolean, default: true, index: true },
+        verificationStatus: { type: String, enum: ["active", "processing"], default: "active", index: true },
         rateLimit: { type: Number, default: 60, min: 1, max: 1000 },
         webhookUrl: { type: String, default: "" },
         defaultAiAgentId: { type: Schema.Types.ObjectId, ref: "AIAgent", default: null },

@@ -104,7 +104,7 @@ export const subscribeToPlan = async (input: SubscriptionInput, user?: Authentic
     // Paid workspaces remain visible to their owner, but cannot use the
     // dashboard until the payment is confirmed by the platform.
     if (subscriptionWorkspaceId) {
-        await Workspace.findByIdAndUpdate(subscriptionWorkspaceId, { $set: { isActive: false } }).exec();
+        await Workspace.findByIdAndUpdate(subscriptionWorkspaceId, { $set: { isActive: false, verificationStatus: "processing" } }).exec();
     }
 
     return {
@@ -164,6 +164,7 @@ export const startFreeSubscription = async (
     ).exec();
 
     workspace.isActive = true;
+    workspace.verificationStatus = "active";
     await workspace.save();
 
     return { planCode: plan.code, status: subscription.status, currentPeriodEnd: subscription.currentPeriodEnd };
