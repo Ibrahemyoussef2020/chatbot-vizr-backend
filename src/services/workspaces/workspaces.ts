@@ -95,6 +95,7 @@ const serialize = (workspace: {
     selectedPlanCode?: string;
     isActive: boolean;
     rateLimit: number;
+    ownerId?: unknown;
     createdAt?: Date;
     updatedAt?: Date;
 }) => ({
@@ -112,12 +113,23 @@ const serialize = (workspace: {
     selected_plan_code: workspace.selectedPlanCode || "",
     is_active: workspace.isActive,
     rate_limit: workspace.rateLimit,
+    owner: workspace.ownerId && typeof workspace.ownerId === "object" && "_id" in workspace.ownerId
+        ? {
+            id: String((workspace.ownerId as { _id: unknown })._id),
+            name: (workspace.ownerId as { name?: string }).name || "Unknown owner",
+            email: (workspace.ownerId as { email?: string }).email || "",
+        }
+        : null,
     created_at: workspace.createdAt,
     updated_at: workspace.updatedAt,
 });
 
 export const listWorkspaces = async (user: AuthenticatedUserContext) => {
-    const workspaces = await Workspace.find(scope(user)).sort({ createdAt: -1 }).lean().exec();
+    const workspaces = await Workspace.find(scope(user))
+        .populate("ownerId", "name email")
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec();
     const workspaceIds = workspaces.map((workspace) => workspace._id);
     const [pendingWorkspaceIds, activeSubscriptionIds] = await Promise.all([
         PaymentTransaction.distinct("workspaceId", {
@@ -234,6 +246,12 @@ export const updateWorkspace = async (
         await ensureWorkspaceChannelDefaults(workspace._id);
     }
     if (!workspace) throw notFoundError("Workspace not found");
+    const inputKeys = Object.keys(input);
+    const isOwnedByPlatformAdmin = user.role === "super_admin" && String(workspace.ownerId) === String(user.id);
+    const isVerificationOnlyUpdate = inputKeys.length > 0 && inputKeys.every((key) => key === "is_active");
+    if (user.role === "super_admin" && !isOwnedByPlatformAdmin && !isVerificationOnlyUpdate) {
+        throw forbiddenError("Only the workspace owner can edit this workspace profile");
+    }
     const changes: Record<string, unknown> = {};
 
     if (input.name !== undefined) changes.name = input.name.trim();
