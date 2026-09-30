@@ -109,16 +109,6 @@ export const getOverview = async (
         ? await Message.countDocuments({ conversationId: { $in: conversationIds } })
         : 0;
 
-    const chartTimeSeries = rawTimeSeries.length || recent > 0
-        ? rawTimeSeries
-        : await Conversation.aggregate([
-            { $match: conversationScope },
-            { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, total: { $sum: 1 }, open: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } }, closed: { $sum: { $cond: [{ $eq: ["$status", "ended"] }, 1, 0] } } } },
-            { $sort: { _id: -1 } },
-            { $limit: 7 },
-            { $sort: { _id: 1 } },
-        ]);
-
     const totalCalc = total;
     const endedPercent = totalCalc > 0 ? Math.round((ended / totalCalc) * 100) : 0;
     const aiResolutionPercent = endedPercent;
@@ -137,7 +127,7 @@ export const getOverview = async (
     });
 
     const timeSeriesMap = new Map<string, { total: number; open: number; closed: number }>();
-    for (const item of chartTimeSeries) {
+    for (const item of rawTimeSeries) {
         timeSeriesMap.set(item._id, {
             total: item.total,
             open: item.open,
@@ -145,9 +135,7 @@ export const getOverview = async (
         });
     }
 
-    const fullDateWindow = chartTimeSeries.length && !rawTimeSeries.length
-        ? generateDateWindow(7).flatMap((_, index) => chartTimeSeries[index]?._id ? [chartTimeSeries[index]._id] : [])
-        : generateDateWindow(7);
+    const fullDateWindow = generateDateWindow(7);
     const timeSeries = fullDateWindow.map((dateStr) => {
         const found = timeSeriesMap.get(dateStr);
         return {
