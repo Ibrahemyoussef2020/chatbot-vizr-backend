@@ -279,6 +279,45 @@ export const updateWorkspace = async (
 
     if (!updated) throw notFoundError("Workspace not found");
 
+    // The confirmation screen's Active action is the platform approval path.
+    // Approving only the workspace flag would leave the customer's payment
+    // pending and keep their dashboard locked, so activate the matching
+    // subscription in the same operation.
+    if (user.role === "super_admin" && input.is_active === true) {
+        const payment = await PaymentTransaction.findOne({
+            workspaceId: workspace._id,
+            status: { $in: ["pending", "awaiting_review", "succeeded"] },
+        }).sort({ createdAt: -1 }).exec();
+        if (payment) {
+            payment.status = "succeeded";
+            payment.reviewedBy = new Types.ObjectId(user.id);
+            payment.reviewedAt = new Date();
+            payment.reviewNote = payment.reviewNote || "Workspace activated by the platform administrator.";
+            await payment.save();
+
+            const start = new Date();
+            const end = new Date(start);
+            payment.billingCycle === "yearly" ? end.setFullYear(end.getFullYear() + 1) : end.setMonth(end.getMonth() + 1);
+            await Subscription.findOneAndUpdate(
+                { workspaceId: workspace._id },
+                {
+                    $set: {
+                        planId: payment.planId,
+                        planCode: payment.planCode,
+                        status: "active",
+                        billingCycle: payment.billingCycle,
+                        currentPeriodStart: start,
+                        currentPeriodEnd: end,
+                        provider: payment.provider,
+                        cancelAtPeriodEnd: false,
+                    },
+                    $setOnInsert: { workspaceId: workspace._id },
+                },
+                { upsert: true, new: true, runValidators: true },
+            ).exec();
+        }
+    }
+
     return serialize(updated);
 };
 
