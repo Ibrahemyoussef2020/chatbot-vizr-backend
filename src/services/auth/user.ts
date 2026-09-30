@@ -20,7 +20,16 @@ export const listWorkspaceUsersService = async (actor: AuthenticatedUserContext,
         throw forbiddenError("You cannot manage users outside your workspace.");
     }
     const users = await User.find({ workspaceId: workspace._id }).select("name email role workspaceId securityRoleId isActive").populate("securityRoleId", "name code scope").lean();
-    return users.map((user: any) => ({ id: String(user._id), name: user.name, email: user.email, legacyRole: user.role, isActive: user.isActive, securityRole: user.securityRoleId ? { id: String(user.securityRoleId._id), name: user.securityRoleId.name, code: user.securityRoleId.code, scope: user.securityRoleId.scope } : null }));
+    return users.map((user: any) => ({
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+        // Legacy principals may have no User.role; their canonical role is
+        // stored on the security role record instead.
+        legacyRole: user.role || user.securityRoleId?.code || "member",
+        isActive: user.isActive,
+        securityRole: user.securityRoleId ? { id: String(user.securityRoleId._id), name: user.securityRoleId.name, code: user.securityRoleId.code, scope: user.securityRoleId.scope } : null,
+    }));
 };
 
 export const assignWorkspaceUserRoleService = async (actor: AuthenticatedUserContext, userId: string, roleId: string, slug?: string) => {
