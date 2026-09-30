@@ -289,6 +289,10 @@ export const updateWorkspace = async (
             status: { $in: ["pending", "awaiting_review", "succeeded"] },
         }).sort({ createdAt: -1 }).exec();
         if (payment) {
+            workspace.selectedPlanCode = payment.planCode;
+            workspace.isActive = true;
+            workspace.verificationStatus = "active";
+            await workspace.save();
             payment.status = "succeeded";
             payment.reviewedBy = new Types.ObjectId(user.id);
             payment.reviewedAt = new Date();

@@ -186,8 +186,10 @@ export const getWorkspaceSubscriptionStatus = async (user: AuthenticatedUserCont
         status: { $in: ["trialing", "active"] },
         currentPeriodEnd: { $gt: new Date() },
     }).select("planCode status currentPeriodEnd").lean().exec() : null;
-    const matchesSelectedPlan = subscription?.planCode === selectedPlanCode;
-    if (matchesSelectedPlan) {
+    // An active subscription is the source of truth after platform approval.
+    // Do not leave the owner blocked because an older workspace plan code is
+    // stale or a previous payment was selected as the latest transaction.
+    if (subscription) {
         return {
             active: true,
             pending: false,
