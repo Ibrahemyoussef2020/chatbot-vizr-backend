@@ -50,7 +50,7 @@ export const getOverview = async (
     const conversationScope = systemSlug ? { systemSlug } : {};
     const recentSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [total, active, ended, recent, conversations, tokenLogsCount, tagCount, hourlyAggregate, rawTimeSeries, channelAggregate, topicAggregate] = await Promise.all([
+    const [total, active, ended, recent, conversations, tokenLogsCount, tagCount, hourlyAggregate, channelAggregate, topicAggregate, rawTimeSeries] = await Promise.all([
         Conversation.countDocuments(conversationScope),
         Conversation.countDocuments({ ...conversationScope, status: "active" }),
         Conversation.countDocuments({ ...conversationScope, status: "ended" }),
